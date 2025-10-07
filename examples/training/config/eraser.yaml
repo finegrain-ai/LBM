@@ -1,5 +1,5 @@
-# wandb
-wandb_project: lbm-surface-flows
+# neptune
+neptune_project: LBM Eraser
 timestep_sampling: custom_timesteps
 unet_input_channels: 4
 vae_num_channels: 4

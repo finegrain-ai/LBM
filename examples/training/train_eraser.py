@@ -10,7 +10,7 @@ import braceexpand
 import fire
 import torch
 import yaml
-from diffusers import FlowMatchEulerDiscreteScheduler, StableDiffusionXLPipeline
+from diffusers import FlowMatchEulerDiscreteScheduler, StableDiffusionPipeline
 from diffusers.models import UNet2DConditionModel
 from diffusers.models.attention import BasicTransformerBlock
 from diffusers.models.resnet import ResnetBlock2D
@@ -45,7 +45,7 @@ from lbm.trainer.utils import StateDictAdapter
 
 
 def get_model(
-    backbone_signature: str = "stabilityai/stable-diffusion-xl-base-1.0",
+    backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
     timestep_sampling: str = "log_normal",
@@ -68,7 +68,7 @@ def get_model(
     conditioners = []
 
     # Load pretrained model as base
-    pipe = StableDiffusionXLPipeline.from_pretrained(
+    pipe = StableDiffusionPipeline.from_pretrained(
         backbone_signature,
         torch_dtype=torch.bfloat16,
     )
@@ -82,14 +82,22 @@ def get_model(
         flip_sin_to_cos=True,
         freq_shift=0,
         down_block_types=[
-            "DownBlock2D",
+            # SD15 specific
             "CrossAttnDownBlock2D",
             "CrossAttnDownBlock2D",
+            "CrossAttnDownBlock2D",
+            "DownBlock2D"
         ],
         mid_block_type="UNetMidBlock2DCrossAttn",
-        up_block_types=["CrossAttnUpBlock2D", "CrossAttnUpBlock2D", "UpBlock2D"],
+        up_block_types=[
+            # SD15 specific
+            "UpBlock2D",
+            "CrossAttnUpBlock2D",
+            "CrossAttnUpBlock2D",
+            "CrossAttnUpBlock2D"
+        ],
         only_cross_attention=False,
-        block_out_channels=[320, 640, 1280],
+        block_out_channels=[320, 640, 1280, 1280], # match SD1.5
         layers_per_block=2,
         downsample_padding=1,
         mid_block_scale_factor=1,
@@ -97,15 +105,19 @@ def get_model(
         act_fn="silu",
         norm_num_groups=32,
         norm_eps=1e-05,
-        cross_attention_dim=[320, 640, 1280],
-        transformer_layers_per_block=[1, 2, 10],
+        # Official SDXL is : cross_attention_dim=2048
+        # In LBM, cross-attention are self-attentions, and cross_attention_dim=[320, 640, 1280] is used
+        # Official SD1.5 is : cross_attention_dim=768
+        # We use 480 as a proportional/simple approach for SD1.5
+        cross_attention_dim=480,
+        transformer_layers_per_block=1,
         reverse_transformer_layers_per_block=None,
         encoder_hid_dim=None,
         encoder_hid_dim_type=None,
-        attention_head_dim=[5, 10, 20],
+        attention_head_dim=8,
         num_attention_heads=None,
         dual_cross_attention=False,
-        use_linear_projection=True,
+        use_linear_projection=False,
         class_embed_type=None,
         addition_embed_type=None,
         addition_time_embed_dim=None,
@@ -131,15 +143,16 @@ def get_model(
 
     state_dict = pipe.unet.state_dict()
 
-    del state_dict["add_embedding.linear_1.weight"]
-    del state_dict["add_embedding.linear_1.bias"]
-    del state_dict["add_embedding.linear_2.weight"]
-    del state_dict["add_embedding.linear_2.bias"]
+    denoise_state_dict = denoiser.state_dict()
+    assert (
+        denoise_state_dict["down_blocks.0.attentions.0.proj_in.weight"].shape == state_dict["down_blocks.0.attentions.0.proj_in.weight"].shape,
+        f"Shape mismatch: {denoise_state_dict['down_blocks.0.attentions.0.proj_in.weight'].shape} vs {state_dict['down_blocks.0.attentions.0.proj_in.weight'].shape}",
+    )
 
     # Adapt the shapes
     state_dict_adapter = StateDictAdapter()
     state_dict = state_dict_adapter(
-        model_state_dict=denoiser.state_dict(),
+        model_state_dict=denoise_state_dict,
         checkpoint_state_dict=state_dict,
         regex_keys=[
             r"class_embedding.linear_\d+.(weight|bias)",
@@ -149,7 +162,7 @@ def get_model(
         ],
         strategy="zeros",
     )
-
+    
     denoiser.load_state_dict(state_dict, strict=True)
 
     del pipe
@@ -353,13 +366,13 @@ def get_data_module(
 def main(
     train_shards: List[str] = ["pipe:cat path/to/train/shards"],
     validation_shards: List[str] = ["pipe:cat path/to/validation/shards"],
-    backbone_signature: str = "stabilityai/stable-diffusion-xl-base-1.0",
+    backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
-    source_key: str = "image",
-    target_key: str = "normal",
+    source_key: str = "before",
+    target_key: str = "after",
     mask_key: str = "mask",
-    wandb_project: str = "lbm-surface",
+    neptune_project: str = "LBM Eraser",
     batch_size: int = 8,
     num_steps: List[int] = [1, 2, 4],
     learning_rate: float = 5e-5,
@@ -511,11 +524,12 @@ def main(
         num_nodes=int(os.environ["SLURM_NNODES"]),
         strategy=strategy,
         default_root_dir="logs",
-        logger=loggers.WandbLogger(
-            project=wandb_project, offline=False, name=run_name, save_dir=save_ckpt_path
+        logger=loggers.NeptuneLogger(
+            project=neptune_project, offline=False, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
-            WandbSampleLogger(log_batch_freq=log_interval),
+            # to be tested, is WandbSampleLogger compatible with NeptuneLogger?
+            WandbSampleLogger(log_batch_freq=log_interval), 
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
