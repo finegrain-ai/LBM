@@ -20,7 +20,7 @@ Prepare a group of [webdataset](https://github.com/webdataset/webdataset) shards
 ### Train
 
 To train the model on a single GPU machine, you can use the following command.
-Works on a single RTX 3090  
+Works on a single RTX 3090:
 
 ```bash
 # Mock the SLURM env variables
