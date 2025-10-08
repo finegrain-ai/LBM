@@ -40,7 +40,7 @@ from lbm.models.lbm import LBMConfig, LBMModel
 from lbm.models.unets import DiffusersUNet2DCondWrapper
 from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
-from lbm.trainer.loggers import WandbSampleLogger
+from lbm.trainer.loggers import NeptuneLogger
 from lbm.trainer.utils import StateDictAdapter
 
 
@@ -525,11 +525,11 @@ def main(
         strategy=strategy,
         default_root_dir="logs",
         logger=loggers.NeptuneLogger(
-            project=neptune_project, offline=False, name=run_name, log_model_checkpoints=False
+            project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
             # to be tested, is WandbSampleLogger compatible with NeptuneLogger?
-            WandbSampleLogger(log_batch_freq=log_interval), 
+            NeptuneLogger(log_batch_freq=log_interval), 
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
