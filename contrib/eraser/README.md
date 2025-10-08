@@ -32,8 +32,8 @@ export SLURM_NODEID=0
 export SLURM_NNODES=1
 export SLURM_LOCALID=0 
 
-# neptune mode, 
-export NEPTUNE_MODE=async # use 'offline' to disable neptune logging
+# Neptune (https://neptune.ai) settings. Use 'offline' mode to disable logging.
+export NEPTUNE_MODE=async
 export NEPTUNE_API_TOKEN="YOUR_API_TOKEN"
 
 # dataset
