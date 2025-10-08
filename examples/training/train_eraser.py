@@ -467,7 +467,7 @@ def main(
 
     training_signature = (
         datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        + "-LBM-Surface"
+        + "-LBM-Eraser"
         + f"{os.environ['SLURM_JOB_ID']}"
         + f"_{os.environ.get('SLURM_ARRAY_TASK_ID', 0)}"
     )
