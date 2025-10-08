@@ -519,7 +519,6 @@ def main(
             project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
-            # to be tested, is WandbSampleLogger compatible with NeptuneLogger?
             NeptuneLogger(log_batch_freq=log_interval), 
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
