@@ -15,10 +15,10 @@ conditioning_masks_keys: []
 
 # SHARDS_PATH_OR_URLS
 train_shards:
-  - pipe:cat PATH_TO_TRAIN_TARS
+  - pipe:cat $PATH_TO_TRAIN_TARS
 
 validation_shards:
-  - pipe:cat PATH_TO_VAL_TARS
+  - pipe:cat $PATH_TO_VAL_TARS
 
 batch_size: 4
 learning_rate: 4e-5

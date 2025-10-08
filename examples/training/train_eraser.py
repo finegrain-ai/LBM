@@ -53,8 +53,8 @@ def get_model(
     prob: Optional[List[float]] = None,
     conditioning_images_keys: Optional[List[str]] = [],
     conditioning_masks_keys: Optional[List[str]] = [],
-    source_key: str = "source_image",
-    target_key: str = "source_image_paste",
+    source_key: str = "before",
+    target_key: str = "after",
     mask_key: str = "mask",
     bridge_noise_sigma: float = 0.0,
     logit_mean: float = 0.0,
@@ -109,7 +109,7 @@ def get_model(
         # In LBM, cross-attention are self-attentions, and cross_attention_dim=[320, 640, 1280] is used
         # Official SD1.5 is : cross_attention_dim=768
         # We use 480 as a proportional/simple approach for SD1.5
-        cross_attention_dim=480,
+        cross_attention_dim=[320, 640, 1280, 1280],
         transformer_layers_per_block=1,
         reverse_transformer_layers_per_block=None,
         encoder_hid_dim=None,
@@ -232,24 +232,23 @@ def get_model(
 
     return model
 
-
 def get_filter_mappers():
     filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["jpg", "normal_aligned.png", "mask.png"])),
+        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png"], verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
                     KeyRenameMapperConfig(
                         key_map={
-                            "jpg": "image",
-                            "normal_aligned.png": "normal",
+                            "before.jpg": "before",
+                            "after.jpg": "after",
                             "mask.png": "mask",
                         }
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
-                        key="image",
+                        key="before",
                         transforms=["ToTensor", "Resize"],
                         transforms_kwargs=[
                             {},
@@ -262,7 +261,7 @@ def get_filter_mappers():
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
-                        key="normal",
+                        key="after",
                         transforms=["ToTensor", "Resize"],
                         transforms_kwargs=[
                             {},
@@ -287,8 +286,8 @@ def get_filter_mappers():
                         ],
                     )
                 ),
-                RescaleMapper(RescaleMapperConfig(key="image")),
-                RescaleMapper(RescaleMapperConfig(key="normal")),
+                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)),
+                RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
             ],
         ),
     ]
@@ -434,7 +433,7 @@ def main(
         learning_rate=learning_rate,
         lr_scheduler_name=learning_rate_scheduler,
         lr_scheduler_kwargs=learning_rate_scheduler_kwargs,
-        log_keys=["image", "normal", "mask"],
+        log_keys=["before", "after", "mask"],
         trainable_params=train_parameters,
         optimizer_name=optimizer,
         optimizer_kwargs=optimizer_kwargs,
@@ -454,7 +453,7 @@ def main(
     else:
         start_ckpt = None
 
-    pipeline = TrainingPipeline(model=model, pipeline_config=training_config)
+    pipeline = TrainingPipeline(model=model, pipeline_config=training_config, verbose=True)
 
     pipeline.save_hyperparameters(
         {

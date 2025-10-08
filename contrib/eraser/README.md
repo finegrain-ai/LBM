@@ -1,10 +1,44 @@
 ## LBM Eraser
 
-Reproduce Eraser result from LBM paper.
+Reproduce Eraser result from LBM paper on SD1.5.
 Non-official implementation.
 
-To train the model, you can use the following command:
+### Dataset
+
+Prepare a group [webdataset](https://github.com/webdataset/webdataset) shards organized like 
+
+```
+<id0>.after.jpg
+<id0>.before.jpg
+<id0>.mask.png
+<id1>.after.jpg
+<id1>.before.jpg
+<id1>.mask.png
+...
+```
+
+### Train
+
+To train the model on a single GPU machine, you can use the following command.
+Works on a single RTX 3090  
 
 ```bash
+# Mock the SLURM env variables
+export SLURM_JOB_ID=0000 
+export SLURM_PROCID=0 
+export SLURM_ARRAY_TASK_ID=0
+export SLURM_NPROCS=1
+export SLURM_NODEID=0
+export SLURM_NNODES=1
+export SLURM_LOCALID=0 
+
+# neptune mode, 
+export NEPTUNE_MODE=async # use 'offline' to disable neptune logging
+export NEPTUNE_API_TOKEN="YOUR_API_TOKEN"
+
+# dataset
+export PATH_TO_TRAIN_TARS=...
+export PATH_TO_VAL_TARS=...
+
 python examples/training/train_eraser.py examples/training/config/eraser.yaml
 ```
