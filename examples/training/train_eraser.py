@@ -140,10 +140,6 @@ def get_model(
     state_dict = pipe.unet.state_dict()
 
     denoise_state_dict = denoiser.state_dict()
-    assert (
-        denoise_state_dict["down_blocks.0.attentions.0.proj_in.weight"].shape == state_dict["down_blocks.0.attentions.0.proj_in.weight"].shape,
-        f"Shape mismatch: {denoise_state_dict['down_blocks.0.attentions.0.proj_in.weight'].shape} vs {state_dict['down_blocks.0.attentions.0.proj_in.weight'].shape}",
-    )
 
     # Adapt the shapes
     state_dict_adapter = StateDictAdapter()
