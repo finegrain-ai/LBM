@@ -1,6 +1,6 @@
 ## LBM Eraser
 
-Reproduce Eraser result from LBM paper on SD1.5.
+**Goal**: reproduce the object-removal result from the LBM paper (Section 4.1) using SD1.5.
 Non-official implementation.
 
 ### Dataset
