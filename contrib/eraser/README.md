@@ -5,7 +5,7 @@ Non-official implementation.
 
 ### Dataset
 
-Prepare a group [webdataset](https://github.com/webdataset/webdataset) shards organized like 
+Prepare a group of [webdataset](https://github.com/webdataset/webdataset) shards, organized like:
 
 ```
 <id0>.after.jpg
