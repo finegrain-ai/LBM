@@ -382,7 +382,7 @@ class NeptuneLogger(Callback):
                     pl_module.train()
         else:
             logging.warning(
-                "log_img method not found in LightningModule. Skipping image logging."
+                "log_samples method not found in LightningModule. Skipping image logging."
             )
 
     @rank_zero_only
