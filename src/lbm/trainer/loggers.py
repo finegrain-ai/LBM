@@ -326,10 +326,10 @@ class TensorBoardSampleLogger(Callback):
 
 class NeptuneLogger(Callback):
     """
-    Logger for logging samples to wandb. This logger is used to log images, text, and metrics to wandb.
+    Logger for logging samples to Neptune. This logger is used to log images, text, and metrics to Neptune.
 
     Args:
-        log_batch_freq (int): The frequency of logging samples to wandb. Default is 100.
+        log_batch_freq (int): The frequency of logging samples to Neptune. Default is 100.
     """
 
     def __init__(self, log_batch_freq: int = 100):
