@@ -105,11 +105,7 @@ def get_model(
         act_fn="silu",
         norm_num_groups=32,
         norm_eps=1e-05,
-        # Official SDXL is : cross_attention_dim=2048
-        # In LBM, cross-attention are self-attentions, and cross_attention_dim=[320, 640, 1280] is used
-        # Official SD1.5 is : cross_attention_dim=768
-        # We use 480 as a proportional/simple approach for SD1.5
-        cross_attention_dim=[320, 640, 1280, 1280],
+        cross_attention_dim=[320, 640, 1280, 1280], # match SD1.5 = block_out_channels
         transformer_layers_per_block=1,
         reverse_transformer_layers_per_block=None,
         encoder_hid_dim=None,
