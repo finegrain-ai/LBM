@@ -422,7 +422,7 @@ class NeptuneLogger(Callback):
                     )
 
             # dict of tensors (e.g. metrics)
-            if isinstance(value, dict):
+            if isinstance(value, dict) and value:
                 for k, v in value.items():
                     if isinstance(v, torch.Tensor):
                         value[k] = v.detach().cpu().numpy()
