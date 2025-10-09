@@ -41,5 +41,5 @@ export NEPTUNE_API_TOKEN="YOUR_API_TOKEN"
 export PATH_TO_TRAIN_TARS=...
 export PATH_TO_VAL_TARS=...
 
-python examples/training/train_eraser.py examples/training/config/eraser.yaml
+python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
 ```
