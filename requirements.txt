@@ -22,3 +22,4 @@ transformers==4.42.3
 wandb==0.16.2
 webdataset>=0.2.86
 kornia==0.8.0
+neptune>=1.0
