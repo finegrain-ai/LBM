@@ -4,7 +4,7 @@ import os
 import random
 import re
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import braceexpand
 import fire
@@ -179,7 +179,6 @@ def get_model(
     vae_config = AutoencoderKLDiffusersConfig(
         version=backbone_signature,
         subfolder="vae",
-        tiling_size=(128, 128),
     )
     vae = AutoencoderKLDiffusers(vae_config)
     vae.freeze()
@@ -224,7 +223,9 @@ def get_model(
 
     return model
 
-def get_filter_mappers():
+def get_filter_mappers(
+    image_size: Tuple[int, int] # (height, width)
+):
     filters_mappers = [
         KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png"], verbose=True)),
         MapperWrapper(
@@ -245,7 +246,7 @@ def get_filter_mappers():
                         transforms_kwargs=[
                             {},
                             {
-                                "size": (480, 640),
+                                "size": image_size,
                                 "interpolation": InterpolationMode.NEAREST_EXACT,
                             },
                         ],
@@ -258,7 +259,7 @@ def get_filter_mappers():
                         transforms_kwargs=[
                             {},
                             {
-                                "size": (480, 640),
+                                "size": image_size,
                                 "interpolation": InterpolationMode.NEAREST_EXACT,
                             },
                         ],
@@ -271,7 +272,7 @@ def get_filter_mappers():
                         transforms_kwargs=[
                             {},
                             {
-                                "size": (480, 640),
+                                "size": image_size,
                                 "interpolation": InterpolationMode.NEAREST_EXACT,
                             },
                             {"mean": 0.0, "std": 1.0},
@@ -291,10 +292,11 @@ def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
     batch_size: int,
+    image_size: Tuple[int, int] # (height, width)
 ):
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers()
+    train_filters_mappers = get_filter_mappers(image_size)
 
     # unbrace urls
     train_shards_path_or_urls_unbraced = []
@@ -321,7 +323,7 @@ def get_data_module(
     train_data_config = data_config
 
     # VALIDATION
-    validation_filters_mappers = get_filter_mappers()
+    validation_filters_mappers = get_filter_mappers(image_size)
 
     # unbrace urls
     validation_shards_path_or_urls_unbraced = []
@@ -390,6 +392,7 @@ def main(
     bridge_noise_sigma: float = 0.005,
     save_interval: int = 1000,
     path_config: str = None,
+    image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -412,10 +415,15 @@ def main(
         bridge_noise_sigma=bridge_noise_sigma,
     )
 
+    if isinstance(image_size, list):
+        assert len(image_size) == 2, "image_size must be a tuple of (height, width)"
+        image_size = tuple(image_size)
+
     data_module = get_data_module(
         train_shards=train_shards,
         validation_shards=validation_shards,
         batch_size=batch_size,
+        image_size=image_size
     )
 
     train_parameters = ["denoiser.*"]

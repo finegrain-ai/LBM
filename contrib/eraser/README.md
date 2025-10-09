@@ -16,6 +16,7 @@ Prepare a group of [webdataset](https://github.com/webdataset/webdataset) shards
 <id1>.mask.png
 ...
 ```
+Where "before" is the image containing the object to remove, "mask" is the (fine) segmentation mask of the object in the before image, and "after" is the image without that object (ground truth).
 
 ### Train
 

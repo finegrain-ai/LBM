@@ -9,9 +9,10 @@ pixel_loss_type: lpips # l1 l2
 pixel_loss_weight: 10.0
 latent_loss_type: l2 # l1 l2
 latent_loss_weight: 1.0
-bridge_noise_sigma: 0.005
+bridge_noise_sigma: 0.05 # see Appendix A.1
 conditioning_images_keys: []
 conditioning_masks_keys: []
+image_size: [480, 640] # (H, W)
 
 # SHARDS_PATH_OR_URLS
 train_shards:
@@ -21,7 +22,7 @@ validation_shards:
   - pipe:cat $PATH_TO_VAL_TARS
 
 batch_size: 4
-learning_rate: 4e-5
+learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW
 num_steps: [1, 4]
 log_interval: 500
