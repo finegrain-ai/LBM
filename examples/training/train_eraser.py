@@ -365,7 +365,7 @@ def main(
     source_key: str = "before",
     target_key: str = "after",
     mask_key: str = "mask",
-    neptune_project: str = "LBM Eraser",
+    neptune_project: str = "LBM-Eraser",
     batch_size: int = 8,
     num_steps: List[int] = [1, 2, 4],
     learning_rate: float = 5e-5,
