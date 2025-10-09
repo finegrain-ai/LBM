@@ -1,5 +1,5 @@
 from dataclasses import field
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union, Tuple
 
 from pydantic.dataclasses import dataclass
 
@@ -70,6 +70,7 @@ class TrainingConfig(BaseConfig):
     lr_scheduler_frequency: Optional[int] = 1
     metrics: Optional[List[str]] = None
     tracking_metrics: Optional[List[str]] = None
+    column_visualization_keys: List[Tuple[str, str]] = field(default_factory=lambda: [])
     backup_every: int = 50
     trainable_params: List[str] = field(default_factory=lambda: ["./*"])
     log_keys: Optional[Union[str, List[str]]] = "txt"

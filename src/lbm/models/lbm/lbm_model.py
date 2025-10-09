@@ -501,7 +501,7 @@ class LBMModel(BaseModel):
                 z = source_image
 
             with torch.autocast(dtype=self.dtype, device_type="cuda"):
-                logs[f"samples_{num_step}_steps"] = self.sample(
+                logs[f"{num_step}_steps"] = self.sample(
                     z,
                     num_steps=num_step,
                     conditioner_inputs=batch,

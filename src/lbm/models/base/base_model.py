@@ -49,10 +49,6 @@ class BaseModel(nn.Module):
             self.dtype = dtype
         return self
 
-    def compute_metrics(self, batch: Dict[str, Any], *args, **kwargs):
-        """Compute the metrics"""
-        return {}
-
     def sample(self, batch: Dict[str, Any], *args, **kwargs):
         """Sample from the model"""
         return {}

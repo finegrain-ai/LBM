@@ -236,6 +236,7 @@ def get_filter_mappers(
                             "before.jpg": "before",
                             "after.jpg": "after",
                             "mask.png": "mask",
+                            "__key__": "uid"
                         }
                     )
                 ),
@@ -309,7 +310,7 @@ def get_data_module(
     random.shuffle(train_shards_path_or_urls_unbraced)
 
     # data config
-    data_config = DataModuleConfig(
+    train_data_config = DataModuleConfig(
         shards_path_or_urls=train_shards_path_or_urls_unbraced,
         decoder="pil",
         shuffle_before_split_by_node_buffer_size=20,
@@ -319,8 +320,6 @@ def get_data_module(
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
     )
-
-    train_data_config = data_config
 
     # VALIDATION
     validation_filters_mappers = get_filter_mappers(image_size)
@@ -332,18 +331,16 @@ def get_data_module(
             braceexpand.braceexpand(validation_shards_path_or_url)
         )
 
-    data_config = DataModuleConfig(
+    validation_data_config = DataModuleConfig(
         shards_path_or_urls=validation_shards_path_or_urls_unbraced,
         decoder="pil",
-        shuffle_before_split_by_node_buffer_size=10,
-        shuffle_before_split_by_workers_buffer_size=10,
-        shuffle_before_filter_mappers_buffer_size=10,
-        shuffle_after_filter_mappers_buffer_size=10,
+        shuffle_before_split_by_node_buffer_size=None,
+        shuffle_before_split_by_workers_buffer_size=None,
+        shuffle_before_filter_mappers_buffer_size=None,
+        shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
     )
-
-    validation_data_config = data_config
 
     # data module
     data_module = DataModule(
@@ -392,6 +389,8 @@ def main(
     bridge_noise_sigma: float = 0.005,
     save_interval: int = 1000,
     path_config: str = None,
+    val_check_interval: int = 1000,
+    limit_val_batches: int = 2,
     image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
 ):
     model = get_model(
@@ -441,6 +440,11 @@ def main(
             "input_shape": None,
             "num_steps": num_steps,
         },
+        column_visualization_keys=[
+            ("before", f"{num_step}_steps") # see lbm_model.py
+            for num_step in num_steps
+        ],
+        metrics=["lpips", "psnr", "pieapp", "dists"]
     )
     if (
         os.path.exists(save_ckpt_path)
@@ -537,8 +541,8 @@ def main(
         ],
         num_sanity_val_steps=0,
         precision="bf16-mixed",
-        limit_val_batches=2,
-        val_check_interval=1000,
+        limit_val_batches=limit_val_batches,
+        val_check_interval=val_check_interval,
         max_epochs=max_epochs,
     )
 

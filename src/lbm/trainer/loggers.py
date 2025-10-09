@@ -10,7 +10,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities import rank_zero_only
 from torchvision.utils import make_grid
-
+from lbm.data.datasets.collation_fn import custom_collation_fn
 from ..trainer import TrainingPipeline
 
 logging.basicConfig(level=logging.INFO)
@@ -92,238 +92,6 @@ def wrap_text(
     lines.append(current_line)
     return lines
 
-
-class WandbSampleLogger(Callback):
-    """
-    Logger for logging samples to wandb. This logger is used to log images, text, and metrics to wandb.
-
-    Args:
-        log_batch_freq (int): The frequency of logging samples to wandb. Default is 100.
-    """
-
-    def __init__(self, log_batch_freq: int = 100):
-        super().__init__()
-        self.log_batch_freq = log_batch_freq
-
-    def on_train_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="train")
-        self._process_logs(trainer, outputs, split="train")
-
-    def on_validation_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="val")
-        self._process_logs(trainer, outputs, split="val")
-
-    @rank_zero_only
-    @torch.no_grad()
-    def log_samples(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Dict[str, Any],
-        batch_idx: int,
-        split: str = "train",
-    ) -> None:
-        if hasattr(pl_module, "log_samples"):
-            if batch_idx % self.log_batch_freq == 0:
-                is_training = pl_module.training
-                if is_training:
-                    pl_module.eval()
-
-                logs = pl_module.log_samples(batch)
-                logs = self._process_logs(trainer, logs, split=split)
-
-                if is_training:
-                    pl_module.train()
-        else:
-            logging.warning(
-                "log_img method not found in LightningModule. Skipping image logging."
-            )
-
-    @rank_zero_only
-    def _process_logs(
-        self, trainer, logs: Dict[str, Any], rescale=True, split="train"
-    ) -> Dict[str, Any]:
-        for key, value in logs.items():
-            if isinstance(value, torch.Tensor):
-                value = value.detach().cpu()
-                if value.dim() == 4:
-                    images = value
-                    if rescale:
-                        images = (images + 1.0) / 2.0
-                    grid = make_grid(images, nrow=4)
-                    grid = grid.permute(1, 2, 0)
-                    grid = grid.mul(255).clamp(0, 255).to(torch.uint8)
-                    logs[key] = grid.numpy()
-                    trainer.logger.experiment.log(
-                        {f"{key}/{split}": [wandb.Image(Image.fromarray(logs[key]))]},
-                        step=trainer.global_step,
-                    )
-
-                # Scalar tensor
-                if value.dim() == 1 or value.dim() == 0:
-                    value = value.float().numpy()
-                    trainer.logger.experiment.log(
-                        {f"{key}/{split}": value}, step=trainer.global_step
-                    )
-
-            # list of string (e.g. text)
-            if isinstance(value, list):
-                if isinstance(value[0], str):
-                    pil_image_texts = create_grid_texts(value)
-                    wandb_image = wandb.Image(pil_image_texts)
-                    trainer.logger.experiment.log(
-                        {f"{key}/{split}": [wandb_image]},
-                        step=trainer.global_step,
-                    )
-
-            # dict of tensors (e.g. metrics)
-            if isinstance(value, dict):
-                for k, v in value.items():
-                    if isinstance(v, torch.Tensor):
-                        value[k] = v.detach().cpu().numpy()
-                trainer.logger.experiment.log(
-                    {f"{key}/{split}": value}, step=trainer.global_step
-                )
-
-            if isinstance(value, int) or isinstance(value, float):
-                trainer.logger.experiment.log(
-                    {f"{key}/{split}": value}, step=trainer.global_step
-                )
-
-        return logs
-
-
-class TensorBoardSampleLogger(Callback):
-    """
-    Logger for logging samples to tensorboard. This logger is used to log images, text, and metrics to tensorboard.
-
-    Args:
-        log_batch_freq (int): The frequency of logging samples to tensorboard. Default is 100.
-    """
-
-    def __init__(self, log_batch_freq: int = 100):
-        super().__init__()
-        self.log_batch_freq = log_batch_freq
-
-    def on_train_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="train")
-        self._process_logs(trainer, outputs, split="train")
-
-    def on_validation_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="val")
-        self._process_logs(trainer, outputs, split="val")
-
-    @rank_zero_only
-    @torch.no_grad()
-    def log_samples(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Dict[str, Any],
-        batch_idx: int,
-        split: str = "train",
-    ) -> None:
-        if hasattr(pl_module, "log_samples"):
-            if batch_idx % self.log_batch_freq == 0:
-                is_training = pl_module.training
-                if is_training:
-                    pl_module.eval()
-
-                logs = pl_module.log_samples(batch)
-                logs = self._process_logs(trainer, logs, split=split)
-
-                if is_training:
-                    pl_module.train()
-        else:
-            logging.warning(
-                "log_img method not found in LightningModule. Skipping image logging."
-            )
-
-    @rank_zero_only
-    def _process_logs(
-        self, trainer, logs: Dict[str, Any], rescale=True, split="train"
-    ) -> Dict[str, Any]:
-        for key, value in logs.items():
-            if isinstance(value, torch.Tensor):
-                value = value.detach().cpu()
-                if value.dim() == 4:
-                    images = value
-                    if rescale:
-                        images = (images + 1.0) / 2.0
-                    grid = make_grid(images, nrow=4)
-                    # grid = grid.permute(1, 2, 0)
-                    grid = grid.mul(255).clamp(0, 255).to(torch.uint8)
-                    logs[key] = grid.numpy()
-                    trainer.logger.experiment.add_image(
-                        f"{key}/{split}",
-                        logs[key],
-                        trainer.global_step,
-                    )
-
-                # Scalar tensor
-                if value.dim() == 1 or value.dim() == 0:
-                    value = value.float().numpy()
-                    trainer.logger.experiment.add_scalar(
-                        f"{key}/{split}", value, trainer.global_step
-                    )
-
-            # list of string (e.g. text)
-            if isinstance(value, list):
-                if isinstance(value[0], str):
-                    pil_image_texts = create_grid_texts(value)
-                    trainer.logger.experiment.add_image(
-                        f"{key}/{split}",
-                        np.transpose(np.array(pil_image_texts), (2, 0, 1)),
-                        trainer.global_step,
-                    )
-
-            # dict of tensors (e.g. metrics)
-            if isinstance(value, dict):
-                for k, v in value.items():
-                    if isinstance(v, torch.Tensor):
-                        value[k] = v.detach().cpu().numpy()
-                trainer.logger.experiment.add_scalar(
-                    f"{key}/{split}", value, trainer.global_step
-                )
-
-            if isinstance(value, int) or isinstance(value, float):
-                trainer.logger.experiment.add_scalar(
-                    f"{key}/{split}", value, trainer.global_step
-                )
-
-        return logs
-
-
 class NeptuneLogger(Callback):
     """
     Logger for logging samples to Neptune. This logger is used to log images, text, and metrics to Neptune.
@@ -335,7 +103,8 @@ class NeptuneLogger(Callback):
     def __init__(self, log_batch_freq: int = 100):
         super().__init__()
         self.log_batch_freq = log_batch_freq
-
+        self.val_metrics: list[Dict[str, Any]] = []
+    
     def on_train_batch_end(
         self,
         trainer: Trainer,
@@ -344,8 +113,10 @@ class NeptuneLogger(Callback):
         batch: Any,
         batch_idx: int,
     ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="train")
         self._process_logs(trainer, outputs, split="train")
+    
+    def on_validation_start(self, trainer: Trainer, pl_module: TrainingPipeline) -> None:
+        self.val_metrics = []
 
     def on_validation_batch_end(
         self,
@@ -355,41 +126,64 @@ class NeptuneLogger(Callback):
         batch: Any,
         batch_idx: int,
     ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="val")
-        self._process_logs(trainer, outputs, split="val")
+        assert outputs["visuals"] is not None
+        assert outputs["metrics"] is not None
 
-    @rank_zero_only
-    @torch.no_grad()
-    def log_samples(
+        metrics = outputs.pop("metrics")
+        visuals = outputs.pop("visuals")
+        self._process_logs(trainer, visuals, split="val", rescale=True)
+
+        # the metrics are aggregated at each batch
+        # and stored in self.val_metrics
+        # they are logged at the end of the validation epoch
+        first_key = pl_module.log_keys[0]
+        self.val_metrics.append({
+            # batch_size is not always the same 
+            # especially with wds.batched(..., partial=True) (which is the default)
+            "batch_size": batch[first_key].shape[0],
+            **metrics,
+        })
+    
+    def on_validation_end(
         self,
         trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Dict[str, Any],
-        batch_idx: int,
-        split: str = "train",
+        pl_module: TrainingPipeline
     ) -> None:
-        if hasattr(pl_module, "log_samples"):
-            if batch_idx % self.log_batch_freq == 0:
-                is_training = pl_module.training
-                if is_training:
-                    pl_module.eval()
+        
+        collated_metrics = custom_collation_fn(self.val_metrics)
 
-                logs = pl_module.log_samples(batch)
-                logs = self._process_logs(trainer, logs, split=split)
-
-                if is_training:
-                    pl_module.train()
-        else:
-            logging.warning(
-                "log_samples method not found in LightningModule. Skipping image logging."
-            )
+        n_items = sum([self.val_metrics[i]["batch_size"] for i in range(len(self.val_metrics))])
+        if n_items == 0:
+            logging.warning("No items in validation metrics. Skipping metric aggregation.")
+            return
+        
+        # reduce metrics with a mean weighted by batch size
+        # TODO: handle/test multi-gpu aggregation
+        aggregated_metrics = {
+            key: np.sum(
+                collated_metrics[key][index] * self.val_metrics[index]["batch_size"]
+                for index in range(len(self.val_metrics))
+             ) / n_items
+            for key in collated_metrics.keys() if key != "batch_size" 
+        }
+           
+        self._process_logs(
+            trainer,
+            aggregated_metrics,
+            split="val"
+        )
+        self.val_metrics = []
 
     @rank_zero_only
     def _process_logs(
-        self, trainer, logs: Dict[str, Any], rescale=True, split="train"
+        self,
+        trainer,
+        logs: Dict[str, Any],
+        rescale : bool =True,
+        split: str ="train",
     ) -> Dict[str, Any]:
         for key, value in logs.items():
+            full_key = f"{split}/{key}"
             if isinstance(value, torch.Tensor):
                 value = value.detach().cpu()
                 if value.dim() == 4:
@@ -400,7 +194,7 @@ class NeptuneLogger(Callback):
                     grid = grid.permute(1, 2, 0)
                     grid = grid.mul(255).clamp(0, 255).to(torch.uint8)
                     logs[key] = grid.numpy()
-                    trainer.logger.experiment[f"{key}/{split}"].append(
+                    trainer.logger.experiment[full_key].append(
                         NeptuneFile.as_image(Image.fromarray(logs[key])),
                         step=trainer.global_step,
                     )
@@ -408,7 +202,7 @@ class NeptuneLogger(Callback):
                 # Scalar tensor
                 if value.dim() == 1 or value.dim() == 0:
                     value = value.float().numpy()
-                    trainer.logger.experiment[f"{key}/{split}"].append(
+                    trainer.logger.experiment[full_key].append(
                         value, step=trainer.global_step
                     )
 
@@ -417,7 +211,7 @@ class NeptuneLogger(Callback):
                 if isinstance(value[0], str):
                     pil_image_texts = create_grid_texts(value)
                     neptune_image = NeptuneFile.as_image(Image.fromarray(pil_image_texts))
-                    trainer.logger.experiment[f"{key}/{split}"].append(
+                    trainer.logger.experiment[full_key].append(
                         neptune_image, step=trainer.global_step
                     )
 
@@ -427,12 +221,12 @@ class NeptuneLogger(Callback):
                     if isinstance(v, torch.Tensor):
                         value[k] = v.detach().cpu().numpy()
 
-                trainer.logger.experiment[f"{key}/{split}"].append(
+                trainer.logger.experiment[full_key].append(
                     value, step=trainer.global_step
                 )
 
             if isinstance(value, int) or isinstance(value, float):
-                trainer.logger.experiment[f"{key}/{split}"].append(
+                trainer.logger.experiment[full_key].append(
                     value, step=trainer.global_step
                 )
 

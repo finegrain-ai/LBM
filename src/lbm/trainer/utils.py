@@ -191,3 +191,37 @@ class StateDictRenamer:
                 checkpoint_state_dict[new_key] = checkpoint_state_dict.pop(old_key)
                 logging.info(f"Renaming {old_key} to {new_key}")
         return checkpoint_state_dict
+
+def mix_images_column_wise(a: torch.Tensor, b: torch.Tensor, column_width: int = 20) -> torch.Tensor:
+    """
+    Mix two batched images column-wise along width.
+
+    Args:
+        a (torch.Tensor): Tensor of shape (b, c, h, w)
+        b (torch.Tensor): Tensor of shape (b, c, h, w)
+        column_width (int): Width (in pixels) of each alternating column block.
+
+    Returns:
+        torch.Tensor: Mixed tensor of shape (b, c, h, w)
+    """
+    assert a.shape == b.shape, "Inputs must have the same shape"
+    assert a.ndim == 4, "Inputs must be 4D tensors (b, c, h, w)"
+    _, _, _, w = a.shape
+
+    device = a.device
+    dtype = a.dtype
+
+    b = b.to(device=device, dtype=dtype)
+
+    # Build mask pattern [1, 1, 0, 0, 1, 1, 0, 0, ...] along width dimension
+    mask = torch.zeros(w, dtype=torch.bool, device=device)
+    toggle = True
+    for x in range(0, w, column_width):
+        x_end = min(x + column_width, w)
+        mask[x:x_end] = toggle
+        toggle = not toggle
+
+    # with shape (1, 1, 1, w) it broadcasts mask to (b, c, h, w)
+    mask = mask.view(1, 1, 1, w)
+    
+    return torch.where(mask, a, b)
