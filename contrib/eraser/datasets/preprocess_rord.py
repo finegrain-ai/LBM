@@ -1,3 +1,12 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "numpy>=1.26.4",
+#     "opencv-python>=4.11.0.86",
+#     "pillow>=11.3.0",
+#     "tqdm>=4.67.1",
+# ]
+
 # Inspired from https://github.com/Forty-lock/RORD/blob/3736a6ba0520e0eac78f966f8788f252735d065c/preprocessing.py
 # * Code revamped
 # * Build finemask from polygon annotations of dynamic objects

@@ -1,24 +1,28 @@
-## LBM Eraser
+# LBM Eraser
 
 **Goal**: reproduce the object-removal result from the LBM paper (Section 4.1) using SD1.5.
 Non-official implementation.
 
-### Dataset
+## Dataset
 
-Prepare a group of [webdataset](https://github.com/webdataset/webdataset) shards, organized like:
+### Download the RORD dataset locally
 
 ```
-<id0>.after.jpg
-<id0>.before.jpg
-<id0>.mask.png
-<id1>.after.jpg
-<id1>.before.jpg
-<id1>.mask.png
-...
+uv tool install 'huggingface_hub[cli]'
+sudo apt-get install p7zip-full
+bash contrib/eraser/datasets/download_rord.sh
 ```
-Where "before" is the image containing the object to remove, "mask" is the (fine) segmentation mask of the object in the before image, and "after" is the image without that object (ground truth).
 
-### Train
+### Format the data to webdataset
+
+ETA on AWS `c6i.8xlarge`: 2h30
+```
+uv run --script contrib/eraser/datasets/preprocess_rord.py
+```
+
+Result is saved in `data/RORD-processed/` (auto-created if not existing)
+
+## Train
 
 To train the model on a single GPU machine, you can use the following command.
 Works on a single RTX 3090:
