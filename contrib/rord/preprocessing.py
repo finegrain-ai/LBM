@@ -1,6 +1,6 @@
 # Inspired from https://github.com/Forty-lock/RORD/blob/3736a6ba0520e0eac78f966f8788f252735d065c/preprocessing.py
 # * Code revamped
-# * Build finemask from polygon annotations of front annotations only
+# * Build finemask from polygon annotations of dynamic objects
 # * rescaling low definition images
 # * Remove the poisson blending
 
@@ -42,7 +42,10 @@ def build_fine_mask(
     for dic_ann in dic:
         polys = dic_ann["segmentation"]
         class_id = dic_ann["Class_ID"]
-        # only keep front masks
+        # The json contains 2 types of class_ids
+        # - "F*" classes are the ones we want to keep - for example F38 is human
+        # - "BO*", classes are for background or others - for example F30 is table
+        # see the full list of label https://github.com/Forty-lock/RORD
         if class_id[0] != "F":
             continue
         if len(polys) < 6:
@@ -124,7 +127,7 @@ def build_shard(
 def process_split(
     base_path: Path,
     split: str,
-    output: Path,
+    output_path: Path,
     width: int,
     height: int,
     force: bool,
@@ -142,18 +145,18 @@ def process_split(
     for shard_idx, shard in enumerate(tqdm(shards)):
         shard_name = f"{split}-{shard_idx:0{n_leading_zeros}d}"
         # handle resuming if the tar file already exists
-        if (output / f"{shard_name}.tar").exists():
+        if (output_path / f"{shard_name}.tar").exists():
             if not force:
                 print(f"Shard {shard_name} already exists, skipping")
                 continue
             else:
                 print(f"Shard {shard_name} already exists, but force is True, rebuilding")
-                shutil.rmtree(output / shard_name, ignore_errors=True)
+                shutil.rmtree(output_path / shard_name, ignore_errors=True)
 
-        shard_path = output / shard_name
+        shard_path = output_path / shard_name
         build_shard(shard_path, shard, width, height, n_sample_per_shard, threshold)
         # compress shard to a .tar file and delete the uncompressed folder
-        os.system(f"tar --sort=name -cf {shard_path}.tar -C {output} {shard_name}")  # noqa: S605
+        os.system(f"tar --sort=name -cf {shard_path}.tar -C {output_path} {shard_name}")  # noqa: S605
         shutil.rmtree(shard_path)
 
 
@@ -164,11 +167,13 @@ def main() -> None:
     threshold = 0.02
     n_sample_per_shard = 1000
     output_path = Path("data/RORD-processed")
+    output_path.mkdir(parents=True, exist_ok=True)
+
     for split in ["train", "val"]:
         process_split(
             base_path=data_path,
             split=split,
-            output=output_path,
+            output_path=output_path,
             width=width,
             height=height,
             threshold=threshold,
