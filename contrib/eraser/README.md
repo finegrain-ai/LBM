@@ -10,7 +10,7 @@ Non-official implementation.
 ```
 uv tool install 'huggingface_hub[cli]'
 sudo apt-get install p7zip-full
-bash contrib/eraser/datasets/download_rord.sh
+./contrib/eraser/datasets/download_rord.sh
 ```
 
 ### Format the data to webdataset
