@@ -6,6 +6,7 @@
 #     "pillow>=11.3.0",
 #     "tqdm>=4.67.1",
 # ]
+# ///
 
 # Inspired from https://github.com/Forty-lock/RORD/blob/3736a6ba0520e0eac78f966f8788f252735d065c/preprocessing.py
 # * Code revamped
