@@ -13,4 +13,4 @@ ETA on AWS `c6i.8xlarge`: 2h30
 python preprocessing.py
 ```
 
-Result is saved in `data/RORD-processed/`
+Result is saved in `data/RORD-processed/` (auto-created if not existing)
