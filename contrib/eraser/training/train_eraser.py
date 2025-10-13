@@ -228,7 +228,7 @@ def get_filter_mappers(
     image_size: Tuple[int, int] # (height, width)
 ):
     filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png"], verbose=True)),
+        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
@@ -237,6 +237,7 @@ def get_filter_mappers(
                             "before.jpg": "before",
                             "after.jpg": "after",
                             "mask.png": "mask",
+                            "__key__": "uid",
                         }
                     )
                 ),
