@@ -161,7 +161,6 @@ class RandomPixelMasking(BaseMapper):
         return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)
     
     def _process(self, mask: Tensor, image: Tensor, seed: str | None) -> Tensor:
-
         if seed:
             generator = torch.Generator()
             generator.manual_seed(self._seed_from_string(seed))
