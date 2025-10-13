@@ -110,7 +110,7 @@ class RescaleMapperConfig(BaseMapperConfig):
 
 class RandomPixelMaskingConfig(BaseMapperConfig):
     """
-    Replace pixels (corresponding to a mask) in an image with random values.
+    Replace pixels (corresponding to a mask) in an image with uniformly sampled random values.
 
     Args:
 
