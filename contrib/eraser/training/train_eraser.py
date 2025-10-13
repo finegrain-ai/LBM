@@ -4,7 +4,7 @@ import os
 import random
 import re
 import shutil
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any, Dict
 from torch import distributed as dist
 
 import braceexpand
@@ -18,8 +18,16 @@ from diffusers.models.resnet import ResnetBlock2D
 from pytorch_lightning import Trainer, loggers
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.strategies import FSDPStrategy
+from pytorch_lightning.callbacks import Callback
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torchvision.transforms import InterpolationMode
+from pytorch_lightning.utilities import rank_zero_only
+
+from torchmetrics import MetricCollection
+from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from torchmetrics.image.dists import DeepImageStructureAndTextureSimilarity
+from torchmetrics.image.psnr import PeakSignalNoiseRatio
+from torchmetrics import Metric
 
 from lbm.data.datasets import DataModule, DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
@@ -45,6 +53,73 @@ from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
 
+class EraserLogger(Callback):
+    """
+    Eraser Logger Callback.
+
+    Log LPIPS, DISTS, PSNR.
+
+    Use lightning self.log function to log metrics, so 
+    accumulation/distributed logging is handled by lightning.
+    """
+    def __init__(self, num_steps: list[int], device: torch.device, target_key: str = "after"):
+        super().__init__()
+        self.device = device
+        metrics : dict[str, Metric] = {}
+        for n in num_steps:
+            metrics[f"lpips_{n}"] = LearnedPerceptualImagePatchSimilarity().to(self.device)
+            metrics[f"dists_{n}"] = DeepImageStructureAndTextureSimilarity().to(self.device)
+            metrics[f"psnr_{n}"] = PeakSignalNoiseRatio((-1.0, 1.0)).to(self.device)
+        
+        self.metrics = MetricCollection(metrics)
+        self.target_key = target_key
+    
+    @rank_zero_only
+    def on_train_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline,
+        outputs: Dict[str, Any],
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        self.log("train/loss", outputs["loss"])
+
+    def on_validation_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline,
+        outputs: Dict[str, Any],
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        self.log("val/loss", outputs["loss"], on_epoch=True, sync_dist=True)
+
+        samples = pl_module.log_samples(batch)
+
+        # TODO: visualization of samples
+        for metric_key in self.metrics:
+            # predictions in lbm_model.py are named f"samples_{num_step}_steps"
+            n_steps = int(metric_key.split("_")[-1])
+            sample_key = f"samples_{n_steps}_steps"
+            if sample_key not in samples:
+                logging.warning(f"Key f'samples_{n_steps}_steps' not found in outputs. Skipping metric {metric_key}.")
+                continue
+            pred = samples[sample_key].clamp(-1, 1)
+            metric = self.metrics[metric_key]
+            gt = batch[self.target_key]
+
+            metric.update(pred.to(self.device), gt.to(self.device))
+
+    def on_validation_epoch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline
+    ):
+        output = self.metrics.compute()
+        for key, value in output.items():
+            self.log(f"val/{key}", value, sync_dist=True)
+        self.metrics.reset()
 
 def get_model(
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
@@ -537,6 +612,7 @@ def main(
         raise ValueError("No GPU available for training.")
 
     trainer = Trainer(
+        log_every_n_steps=10,
         accelerator="gpu",
         devices=n_gpus,
         num_nodes=1,
@@ -546,6 +622,7 @@ def main(
             project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
+            EraserLogger(num_steps=num_steps, device=torch.device("cuda"), target_key=target_key),
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
