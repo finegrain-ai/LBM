@@ -162,7 +162,7 @@ class RandomPixelMasking(BaseMapper):
     
     def _process(self, mask: Tensor, image: Tensor, seed: str | None) -> Tensor:
         if seed:
-            generator = torch.Generator()
+            generator = torch.Generator(device=image.device)
             generator.manual_seed(self._seed_from_string(seed))
         else:
             generator = None
