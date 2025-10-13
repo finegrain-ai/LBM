@@ -30,6 +30,8 @@ from lbm.data.mappers import (
     RescaleMapperConfig,
     TorchvisionMapper,
     TorchvisionMapperConfig,
+    RandomPixelMasking,
+    RandomPixelMaskingConfig,
 )
 from lbm.models.embedders import (
     ConditionerWrapper,
@@ -53,9 +55,8 @@ def get_model(
     prob: Optional[List[float]] = None,
     conditioning_images_keys: Optional[List[str]] = [],
     conditioning_masks_keys: Optional[List[str]] = [],
-    source_key: str = "before",
+    source_key: str = "before_masked",
     target_key: str = "after",
-    mask_key: str = "mask",
     bridge_noise_sigma: float = 0.0,
     logit_mean: float = 0.0,
     logit_std: float = 1.0,
@@ -189,7 +190,7 @@ def get_model(
         ucg_keys=None,
         source_key=source_key,
         target_key=target_key,
-        mask_key=mask_key,
+        mask_key=None, # for the eraser all the pixels in the target image are valid
         latent_loss_weight=latent_loss_weight,
         latent_loss_type=latent_loss_type,
         pixel_loss_type=pixel_loss_type,
@@ -227,7 +228,7 @@ def get_filter_mappers(
     image_size: Tuple[int, int] # (height, width)
 ):
     filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png"], verbose=True)),
+        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
@@ -236,6 +237,7 @@ def get_filter_mappers(
                             "before.jpg": "before",
                             "after.jpg": "after",
                             "mask.png": "mask",
+                            "__key__": "uid",
                         }
                     )
                 ),
@@ -279,8 +281,20 @@ def get_filter_mappers(
                         ],
                     )
                 ),
-                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)),
+                # Random pixel masking is made on [0, 1] tensors (before RescaleMapper)
+                RandomPixelMasking(
+                    RandomPixelMaskingConfig(
+                        key="before",
+                        mask_key="mask",
+                        output_key="before_masked",
+                        verbose=True,
+                        seed_key="uid"
+                    )
+                ),
+                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization
+                RescaleMapper(RescaleMapperConfig(key="before_masked", verbose=True)),
                 RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
+
             ],
         ),
     ]
@@ -364,7 +378,6 @@ def main(
     unet_input_channels: int = 4,
     source_key: str = "before",
     target_key: str = "after",
-    mask_key: str = "mask",
     neptune_project: str = "LBM-Eraser",
     batch_size: int = 8,
     num_steps: List[int] = [1, 2, 4],
@@ -400,7 +413,6 @@ def main(
         unet_input_channels=unet_input_channels,
         source_key=source_key,
         target_key=target_key,
-        mask_key=mask_key,
         timestep_sampling=timestep_sampling,
         logit_mean=logit_mean,
         logit_std=logit_std,

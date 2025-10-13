@@ -1,14 +1,17 @@
 from typing import Any, Dict
 
 from torchvision import transforms
-
+import torchvision.transforms.functional as F
+import torch
+import hashlib
 from .base import BaseMapper
 from .mappers_config import (
     KeyRenameMapperConfig,
     RescaleMapperConfig,
     TorchvisionMapperConfig,
+    RandomPixelMaskingConfig
 )
-
+from torch import Tensor
 
 class KeyRenameMapper(BaseMapper):
     """
@@ -133,3 +136,36 @@ class RescaleMapper(BaseMapper):
         else:
             batch[self.output_key] = 2 * batch[self.key] - 1
         return batch
+
+class RandomPixelMasking(BaseMapper):
+    """
+    Replace the pixels of an image within a given mask with random values
+    Random values are sampled from a uniform distribution [0, 1]
+
+    Args:
+        config (RandomPixelMaskingConfig): Configuration for the mapper
+    """
+
+    def __init__(self, config: RandomPixelMaskingConfig):
+        super().__init__(config)
+
+    def __call__(self, batch: Dict[str, Any], *args, **kwrags) -> Dict[str, Any]:
+        batch[self.output_key] = self._process(
+            mask=batch[self.config.mask_key],
+            image=batch[self.config.key],
+            seed=batch[self.config.seed_key] if self.config.seed_key else None,
+        )
+        return batch
+    
+    def _seed_from_string(self, s: str) -> int:
+        return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)
+    
+    def _process(self, mask: Tensor, image: Tensor, seed: str | None) -> Tensor:
+        if seed:
+            generator = torch.Generator(device=image.device)
+            generator.manual_seed(self._seed_from_string(seed))
+        else:
+            generator = None
+        
+        noise = torch.empty_like(image).uniform_(generator=generator)
+        return image * (1 - mask) + noise * mask
