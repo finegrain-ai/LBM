@@ -116,12 +116,9 @@ class RandomPixelMaskingConfig(BaseMapperConfig):
 
         key (str): Key to apply the masking to.
         mask_key (str): Key containing the mask to apply.
-        mean (float): Mean of the random values to use for masking.
-        std (float): Standard deviation of the random values to use for masking.
+        seed_key (str | None): Key containing the seed to use for random number generation.
     """
 
     key: str = "image"
     mask_key: str = "mask"
-    seed_key: str = "uid"
-    mean: float = 0.0
-    std: float = 1.0
+    seed_key: str | None = None
