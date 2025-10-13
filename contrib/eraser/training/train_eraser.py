@@ -376,7 +376,7 @@ def main(
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
-    source_key: str = "before",
+    source_key: str = "before_masked",
     target_key: str = "after",
     neptune_project: str = "LBM-Eraser",
     batch_size: int = 8,
