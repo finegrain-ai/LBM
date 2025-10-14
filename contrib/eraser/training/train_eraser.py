@@ -29,6 +29,7 @@ from torchmetrics.image.dists import DeepImageStructureAndTextureSimilarity
 from torchmetrics.image.psnr import PeakSignalNoiseRatio
 from torchmetrics import Metric
 from torchvision.utils import make_grid
+import torch.distributed as dist
 
 from lbm.data.datasets import DataModule, DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
@@ -72,18 +73,24 @@ class EraserLogger(Callback):
     def __init__(
         self, 
         num_steps: list[int], 
-        device: torch.device, 
+        device: torch.device | None = None, 
     ):
         super().__init__()
-        self.device = device
         self.num_steps = num_steps
-        metrics : dict[str, Metric] = {}
+        self.device = device  # can be None; we’ll set it dynamically
+        self.metrics = None  # delay initialization
+
+    def setup(self, trainer: Trainer, pl_module: TrainingPipeline, stage=None):
+        if self.device is None:
+            self.device = pl_module.device
+
+        metrics: dict[str, Metric] = {}
         for n in self.num_steps:
             metrics[f"lpips_{n}"] = LearnedPerceptualImagePatchSimilarity().to(self.device)
             metrics[f"dists_{n}"] = DeepImageStructureAndTextureSimilarity().to(self.device)
             metrics[f"psnr_{n}"] = PeakSignalNoiseRatio((-1.0, 1.0)).to(self.device)
-        
-        self.metrics = MetricCollection(metrics)
+
+        self.metrics = MetricCollection(metrics).to(self.device)
     
     @rank_zero_only
     def on_train_batch_end(
@@ -137,9 +144,11 @@ class EraserLogger(Callback):
             source_key=pl_module.model.source_key,
             uid_key="uid"
         )
-        gathered_imgs = pl_module.all_gather(grids)
 
-        if trainer.is_global_zero:
+        gathered_imgs = self._gather_dict_on_rank0(grids)
+
+        if dist.get_rank() == 0:
+            assert gathered_imgs is not None
             for image_key in gathered_imgs.keys():
                 image = gathered_imgs[image_key]
                 # rescale from [-1, 1] to [0, 1]
@@ -147,6 +156,30 @@ class EraserLogger(Callback):
                 neptune_file = File.as_image(image.cpu().squeeze().permute(1, 2, 0).clip(0, 1))
                 # only compatible with neptune logger
                 trainer.logger.experiment[f"val/{image_key}"].append(neptune_file)
+
+    def _gather_dict_on_rank0(self, local_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        if not dist.is_initialized():
+            return local_dict  # single-process case
+
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+
+        # Each process sends its dict
+        gathered = [None for _ in range(world_size)] if rank == 0 else None
+        dist.gather_object(local_dict, gathered, dst=0)
+
+        if rank == 0:
+            # Merge into a single dict of Tensors
+            merged = {}
+            for d in gathered:
+                for k, v in d.items():
+                    if k not in merged:
+                        merged[k] = v.cpu()
+                    else:
+                        logging.warning(f"Key {k} already exists in merged dict. Dropping duplicate.")
+            return merged
+        else:
+            return None
 
     def on_validation_epoch_end(
         self,
@@ -763,7 +796,9 @@ def main(
             project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
-            EraserLogger(num_steps=num_steps, device=torch.device("cuda")),
+            EraserLogger(
+                num_steps=num_steps
+            ),
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
