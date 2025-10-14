@@ -323,18 +323,23 @@ def get_data_module(
     random.shuffle(train_shards_path_or_urls_unbraced)
 
     # data config
-    data_config = DataModuleConfig(
+    train_data_config = DataModuleConfig(
         shards_path_or_urls=train_shards_path_or_urls_unbraced,
         decoder="pil",
-        shuffle_before_split_by_node_buffer_size=20,
-        shuffle_before_split_by_workers_buffer_size=20,
-        shuffle_before_filter_mappers_buffer_size=20,
-        shuffle_after_filter_mappers_buffer_size=20,
+        # RORD dataset contains 500K images in 500 shards
+        # And we are training with 8 GPUs
+        # 200 out of 500 shards
+        shuffle_before_split_by_node_buffer_size=min(200, len(train_shards_path_or_urls_unbraced)),  
+        # Each node has 500/8 ~ 60 shards, so 30 looks fine
+        shuffle_before_split_by_workers_buffer_size=30,
+        # 10 workers means each worker sees ~ 6 shards = 6k samples
+        # Set it to 2k
+        shuffle_before_filter_mappers_buffer_size=2000,
+        # not needed to shuffle after filter mappers
+        shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
     )
-
-    train_data_config = data_config
 
     # VALIDATION
     validation_filters_mappers = get_filter_mappers(image_size)
@@ -346,18 +351,18 @@ def get_data_module(
             braceexpand.braceexpand(validation_shards_path_or_url)
         )
 
-    data_config = DataModuleConfig(
+    validation_data_config = DataModuleConfig(
         shards_path_or_urls=validation_shards_path_or_urls_unbraced,
         decoder="pil",
-        shuffle_before_split_by_node_buffer_size=10,
-        shuffle_before_split_by_workers_buffer_size=10,
-        shuffle_before_filter_mappers_buffer_size=10,
-        shuffle_after_filter_mappers_buffer_size=10,
+        # deactivate shuffling for validation, so we validate on the same
+        # samples each time
+        shuffle_before_split_by_node_buffer_size=None,
+        shuffle_before_split_by_workers_buffer_size=None,
+        shuffle_before_filter_mappers_buffer_size=None,
+        shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
     )
-
-    validation_data_config = data_config
 
     # data module
     data_module = DataModule(
