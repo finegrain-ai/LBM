@@ -40,10 +40,5 @@ export SLURM_LOCALID=0
 # Neptune (https://neptune.ai) settings. Use 'offline' mode to disable logging.
 export NEPTUNE_MODE=async
 export NEPTUNE_API_TOKEN="YOUR_API_TOKEN"
-
-# dataset
-export PATH_TO_TRAIN_TARS=...
-export PATH_TO_VAL_TARS=...
-
 python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
 ```

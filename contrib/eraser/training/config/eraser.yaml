@@ -14,12 +14,10 @@ conditioning_images_keys: []
 conditioning_masks_keys: []
 image_size: [480, 640] # (H, W)
 
-# SHARDS_PATH_OR_URLS
-train_shards:
-  - pipe:cat $PATH_TO_TRAIN_TARS
-
-validation_shards:
-  - pipe:cat $PATH_TO_VAL_TARS
+train_shards: 
+- "data/RORD-processed/train-{000000..000412}.tar"
+validation_shards: 
+- "data/RORD-processed/val-{000000..000040}.tar"
 
 batch_size: 4
 learning_rate: 3e-5 # see Appendix A.1
