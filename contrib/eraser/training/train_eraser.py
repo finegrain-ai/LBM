@@ -42,7 +42,6 @@ from lbm.models.lbm import LBMConfig, LBMModel
 from lbm.models.unets import DiffusersUNet2DCondWrapper
 from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
-from lbm.trainer.loggers import NeptuneLogger
 from lbm.trainer.utils import StateDictAdapter
 
 
@@ -544,7 +543,6 @@ def main(
             project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
-            NeptuneLogger(log_batch_freq=log_interval), 
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,

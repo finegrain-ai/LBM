@@ -1,7 +1,7 @@
 import logging
 import math
 from typing import Any, Dict, List, Tuple
-from neptune.types import File as NeptuneFile
+
 import numpy as np
 import torch
 import wandb
@@ -319,121 +319,6 @@ class TensorBoardSampleLogger(Callback):
             if isinstance(value, int) or isinstance(value, float):
                 trainer.logger.experiment.add_scalar(
                     f"{key}/{split}", value, trainer.global_step
-                )
-
-        return logs
-
-
-class NeptuneLogger(Callback):
-    """
-    Logger for logging samples to Neptune. This logger is used to log images, text, and metrics to Neptune.
-
-    Args:
-        log_batch_freq (int): The frequency of logging samples to Neptune. Default is 100.
-    """
-
-    def __init__(self, log_batch_freq: int = 100):
-        super().__init__()
-        self.log_batch_freq = log_batch_freq
-
-    def on_train_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="train")
-        self._process_logs(trainer, outputs, split="train")
-
-    def on_validation_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Any,
-        batch_idx: int,
-    ) -> None:
-        self.log_samples(trainer, pl_module, outputs, batch, batch_idx, split="val")
-        self._process_logs(trainer, outputs, split="val")
-
-    @rank_zero_only
-    @torch.no_grad()
-    def log_samples(
-        self,
-        trainer: Trainer,
-        pl_module: TrainingPipeline,
-        outputs: Dict[str, Any],
-        batch: Dict[str, Any],
-        batch_idx: int,
-        split: str = "train",
-    ) -> None:
-        if hasattr(pl_module, "log_samples"):
-            if batch_idx % self.log_batch_freq == 0:
-                is_training = pl_module.training
-                if is_training:
-                    pl_module.eval()
-
-                logs = pl_module.log_samples(batch)
-                logs = self._process_logs(trainer, logs, split=split)
-
-                if is_training:
-                    pl_module.train()
-        else:
-            logging.warning(
-                "log_samples method not found in LightningModule. Skipping image logging."
-            )
-
-    @rank_zero_only
-    def _process_logs(
-        self, trainer, logs: Dict[str, Any], rescale=True, split="train"
-    ) -> Dict[str, Any]:
-        for key, value in logs.items():
-            if isinstance(value, torch.Tensor):
-                value = value.detach().cpu()
-                if value.dim() == 4:
-                    images = value
-                    if rescale:
-                        images = (images + 1.0) / 2.0
-                    grid = make_grid(images, nrow=4)
-                    grid = grid.permute(1, 2, 0)
-                    grid = grid.mul(255).clamp(0, 255).to(torch.uint8)
-                    logs[key] = grid.numpy()
-                    trainer.logger.experiment[f"{key}/{split}"].append(
-                        NeptuneFile.as_image(Image.fromarray(logs[key])),
-                        step=trainer.global_step,
-                    )
-
-                # Scalar tensor
-                if value.dim() == 1 or value.dim() == 0:
-                    value = value.float().numpy()
-                    trainer.logger.experiment[f"{key}/{split}"].append(
-                        value, step=trainer.global_step
-                    )
-
-            # list of string (e.g. text)
-            if isinstance(value, list):
-                if isinstance(value[0], str):
-                    pil_image_texts = create_grid_texts(value)
-                    neptune_image = NeptuneFile.as_image(Image.fromarray(pil_image_texts))
-                    trainer.logger.experiment[f"{key}/{split}"].append(
-                        neptune_image, step=trainer.global_step
-                    )
-
-            # dict of tensors (e.g. metrics)
-            if isinstance(value, dict) and value:
-                for k, v in value.items():
-                    if isinstance(v, torch.Tensor):
-                        value[k] = v.detach().cpu().numpy()
-
-                trainer.logger.experiment[f"{key}/{split}"].append(
-                    value, step=trainer.global_step
-                )
-
-            if isinstance(value, int) or isinstance(value, float):
-                trainer.logger.experiment[f"{key}/{split}"].append(
-                    value, step=trainer.global_step
                 )
 
         return logs
