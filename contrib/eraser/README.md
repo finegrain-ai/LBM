@@ -24,21 +24,19 @@ Result is saved in `data/RORD-processed/` (auto-created if not existing)
 
 ## Train
 
-To train the model on a single GPU machine, you can use the following command.
-Works on a single RTX 3090:
-
 ```bash
-# Mock the SLURM env variables
-export SLURM_JOB_ID=0000 
-export SLURM_PROCID=0 
-export SLURM_ARRAY_TASK_ID=0
-export SLURM_NPROCS=1
-export SLURM_NODEID=0
-export SLURM_NNODES=1
-export SLURM_LOCALID=0 
-
 # Neptune (https://neptune.ai) settings. Use 'offline' mode to disable logging.
 export NEPTUNE_MODE=async
 export NEPTUNE_API_TOKEN="YOUR_API_TOKEN"
+```
+
+To limit to a single GPU
+```bash
+export CUDA_VISIBLE_DEVICES=0
+```
+
+Then
+```bash
 python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
 ```
+
