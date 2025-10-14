@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 from typing import List, Optional, Tuple
+from torch import distributed as dist
 
 import braceexpand
 import fire
@@ -492,11 +493,10 @@ def main(
     training_signature = (
         datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         + "-LBM-Eraser"
-        + f"{os.environ['SLURM_JOB_ID']}"
-        + f"_{os.environ.get('SLURM_ARRAY_TASK_ID', 0)}"
     )
     dir_path = f"{save_ckpt_path}/logs/{training_signature}"
-    if os.environ["SLURM_PROCID"] == "0":
+     # if not initialized (single gpu), we are on the main process before ddp spawns
+    if not dist.is_initialized():
         os.makedirs(dir_path, exist_ok=True)
         if path_config is not None:
             shutil.copy(path_config, f"{save_ckpt_path}/config.yaml")
@@ -532,11 +532,14 @@ def main(
         sharding_strategy="SHARD_GRAD_OP",
         ignored_states=ignore_states,
     )
+    n_gpus = torch.cuda.device_count()
+    if n_gpus < 1:
+        raise ValueError("No GPU available for training.")
 
     trainer = Trainer(
         accelerator="gpu",
-        devices=int(os.environ["SLURM_NPROCS"]) // int(os.environ["SLURM_NNODES"]),
-        num_nodes=int(os.environ["SLURM_NNODES"]),
+        devices=n_gpus,
+        num_nodes=1,
         strategy=strategy,
         default_root_dir="logs",
         logger=loggers.NeptuneLogger(
