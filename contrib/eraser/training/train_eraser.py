@@ -668,11 +668,14 @@ def main(
     config_yaml: dict = None,
     save_ckpt_path: str = "./checkpoints",
     gradient_clip_val: Optional[float] = None,
-    log_interval: int = 100,
+    log_interval: int = 10,
     resume_from_checkpoint: bool = True,
     max_epochs: int = 100,
     bridge_noise_sigma: float = 0.005,
     save_interval: int = 1000,
+    limit_val_batches: int = 2,
+    val_check_interval: int = 1000,
+    save_top_k: int = 1,
     path_config: str = None,
     image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
     resize_mode: str = "Resize" # CenterCrop or Resize
@@ -803,7 +806,7 @@ def main(
         raise ValueError("No GPU available for training.")
 
     trainer = Trainer(
-        log_every_n_steps=10,
+        log_every_n_steps=log_interval,
         gradient_clip_val=gradient_clip_val,
         accelerator="gpu",
         devices=n_gpus,
@@ -822,12 +825,13 @@ def main(
                 dirpath=save_ckpt_path,
                 every_n_train_steps=save_interval,
                 save_last=True,
+                save_top_k=save_top_k,
             ),
         ],
         num_sanity_val_steps=0,
         precision="bf16-mixed",
-        limit_val_batches=2, # 2 x 4 (batch_size) x 8 GPUs = 64 samples for validation
-        val_check_interval=250, # 250 means every 4 (batch) * 8 (gpus) * 250 = 8000 training samples
+        limit_val_batches=limit_val_batches,
+        val_check_interval=val_check_interval,
         max_epochs=max_epochs,
     )
 
