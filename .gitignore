@@ -8,3 +8,4 @@ examples/inference/examples/*
 envs/*
 checkpoints/*
 data/*
+.neptune
