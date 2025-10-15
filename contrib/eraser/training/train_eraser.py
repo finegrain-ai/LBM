@@ -785,7 +785,7 @@ def main(
         raise ValueError("No GPU available for training.")
 
     trainer = Trainer(
-        log_every_n_steps=1,
+        log_every_n_steps=10,
         accelerator="gpu",
         devices=n_gpus,
         num_nodes=1,
