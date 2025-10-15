@@ -80,7 +80,7 @@ class EraserLogger(Callback):
         self.device = device  # can be None; we’ll set it dynamically
         self.metrics = None  # delay initialization
 
-    def setup(self, trainer: Trainer, pl_module: TrainingPipeline, stage=None):
+    def setup(self, trainer: Trainer, pl_module: TrainingPipeline, stage=None) -> None:
         if self.device is None:
             self.device = pl_module.device
 
