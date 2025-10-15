@@ -28,3 +28,4 @@ resume_from_checkpoint: false
 max_epochs: 50
 save_interval: 5000
 save_ckpt_path: ./checkpoints
+gradient_clip_val: null

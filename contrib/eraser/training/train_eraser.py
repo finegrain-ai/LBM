@@ -652,6 +652,7 @@ def main(
     conditioning_masks_keys: Optional[List[str]] = [],
     config_yaml: dict = None,
     save_ckpt_path: str = "./checkpoints",
+    gradient_clip_val: Optional[float] = None,
     log_interval: int = 100,
     resume_from_checkpoint: bool = True,
     max_epochs: int = 100,
@@ -786,6 +787,7 @@ def main(
 
     trainer = Trainer(
         log_every_n_steps=10,
+        gradient_clip_val=gradient_clip_val,
         accelerator="gpu",
         devices=n_gpus,
         num_nodes=1,
