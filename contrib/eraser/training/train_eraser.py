@@ -61,7 +61,7 @@ class EraserLogger(Callback):
     """
     Eraser Logger Callback for Neptune.
 
-    Log LPIPS, DISTS, PSNR.
+    Log LPIPS, DISTS, PSNR metrics, in addition to train and val losses.
 
     Use lightning self.log function to log metrics, so 
     accumulation/distributed logging is handled by lightning.
