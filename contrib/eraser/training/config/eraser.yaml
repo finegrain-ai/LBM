@@ -12,7 +12,8 @@ latent_loss_weight: 1.0
 bridge_noise_sigma: 0.05 # see Appendix A.1
 conditioning_images_keys: []
 conditioning_masks_keys: []
-image_size: [480, 640] # (H, W)
+image_size: [536, 960] # (H, W)
+resize_mode: CenterCrop # CenterCrop or Resize
 
 train_shards: 
 - "data/RORD-processed/train-{000000..000412}.tar"
