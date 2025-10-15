@@ -59,7 +59,7 @@ from neptune.types import File
 
 class EraserLogger(Callback):
     """
-    Eraser Logger Callback for Neptune.
+    Eraser Logger Callback made for Neptune.
 
     Log LPIPS, DISTS, PSNR metrics, in addition to train and val losses.
 
