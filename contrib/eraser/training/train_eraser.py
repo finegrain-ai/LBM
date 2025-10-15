@@ -107,7 +107,7 @@ class EraserLogger(Callback):
     @rank_zero_only
     def on_before_optimizer_step(self, trainer: Trainer, pl_module: TrainingPipeline, optimizer: Optimizer) -> None:
         total_grad_norm = grad_norm(trainer.model, norm_type=2)["grad_2.0_norm_total"]
-        self.log("grad_norm", total_grad_norm, on_step=True, sync_dist=False)
+        self.log("grad_norm", total_grad_norm, on_step=True)
 
     def on_validation_batch_end(
         self,
