@@ -161,7 +161,7 @@ class EraserLogger(Callback):
                 image = (image / 2 + 0.5).clamp(0, 1)
                 neptune_file = File.as_image(image.cpu().squeeze().permute(1, 2, 0).clip(0, 1))
                 # only compatible with neptune logger
-                trainer.logger.experiment[f"val/{image_key}"].append(neptune_file)
+                trainer.logger.experiment[f"val/{image_key}"].append(neptune_file, step=trainer.global_step)
 
     def _gather_dict_on_rank0(self, local_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         if not dist.is_initialized():
