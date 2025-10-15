@@ -19,6 +19,7 @@ from pytorch_lightning import Trainer, loggers
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.strategies import FSDPStrategy
 from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.utilities import grad_norm
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torchvision.transforms import InterpolationMode
 from pytorch_lightning.utilities import rank_zero_only
@@ -56,6 +57,7 @@ from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
 from dataclasses import field
 from neptune.types import File
+from torch.optim.optimizer import Optimizer
 
 class EraserLogger(Callback):
     """
@@ -101,6 +103,11 @@ class EraserLogger(Callback):
         batch_idx: int,
     ) -> None:
         self.log("train/loss", outputs["loss"])
+    
+    @rank_zero_only
+    def on_before_optimizer_step(self, trainer: Trainer, pl_module: TrainingPipeline, optimizer: Optimizer) -> None:
+        total_grad_norm = grad_norm(trainer.model, norm_type=2)["grad_2.0_norm_total"]
+        self.log("grad_norm", total_grad_norm, on_step=True, sync_dist=False)
 
     def on_validation_batch_end(
         self,
