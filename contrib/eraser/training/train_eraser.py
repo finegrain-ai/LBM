@@ -555,8 +555,8 @@ def main(
         ],
         num_sanity_val_steps=0,
         precision="bf16-mixed",
-        limit_val_batches=2,
-        val_check_interval=1000,
+        limit_val_batches=2, # 2 x 4 (batch_size) x 8 GPUs = 64 samples for validation
+        val_check_interval=250, # 250 means every 4 (batch) * 8 (gpus) * 250 = 8000 training samples
         max_epochs=max_epochs,
     )
 
