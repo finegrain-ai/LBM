@@ -11,7 +11,7 @@ from collections import defaultdict
 DATASET_DIR = Path("./data/RORD-processed/")  # directory containing val-*.tar
 OUTPUT_DIR = Path("./data/RORD-processed/")
 TMP_EXTRACT_DIR = Path("./data/RORD-processed-tmp/")
-MAX_SAMPLES_PER_SHARD = 32  # ~320 total scenes, it gives 11 shards
+MAX_SAMPLES_PER_SHARD = 32  # ~340 total scenes, it gives 11 shards
 PATTERN = "val-0*.tar"  # pattern to match tar files
 
 # --- Step A: List tar files ---
