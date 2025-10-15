@@ -22,6 +22,14 @@ uv run --script contrib/eraser/datasets/preprocess_rord.py
 
 Result is saved in `data/RORD-processed/` (auto-created if not existing)
 
+### Val-lite
+
+To improve the diversity of the validation set, we create a `val-lite` version of it, by choosing only one frame per scene in RORD validation set.
+
+```
+python contrib/eraser/datasets/extract_val_lite.py
+```
+
 ## Train
 
 ```bash

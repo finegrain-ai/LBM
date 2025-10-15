@@ -17,7 +17,7 @@ image_size: [480, 640] # (H, W)
 train_shards: 
 - "data/RORD-processed/train-{000000..000412}.tar"
 validation_shards: 
-- "data/RORD-processed/val-{000000..000040}.tar"
+- "data/RORD-processed/val-lite-{000000..000007}.tar" # 8 shards, one per GPU
 
 batch_size: 4
 learning_rate: 3e-5 # see Appendix A.1
