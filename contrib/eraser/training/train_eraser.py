@@ -4,7 +4,7 @@ import os
 import random
 import re
 import shutil
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any, Dict
 from torch import distributed as dist
 
 import braceexpand
@@ -18,8 +18,18 @@ from diffusers.models.resnet import ResnetBlock2D
 from pytorch_lightning import Trainer, loggers
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.strategies import FSDPStrategy
+from pytorch_lightning.callbacks import Callback
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torchvision.transforms import InterpolationMode
+from pytorch_lightning.utilities import rank_zero_only
+
+from torchmetrics import MetricCollection
+from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from torchmetrics.image.dists import DeepImageStructureAndTextureSimilarity
+from torchmetrics.image.psnr import PeakSignalNoiseRatio
+from torchmetrics import Metric
+from torchvision.utils import make_grid
+import torch.distributed as dist
 
 from lbm.data.datasets import DataModule, DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
@@ -44,7 +54,244 @@ from lbm.models.unets import DiffusersUNet2DCondWrapper
 from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
+from dataclasses import field
+from neptune.types import File
 
+class EraserLogger(Callback):
+    """
+    Eraser Logger Callback made for Neptune.
+
+    Log LPIPS, DISTS, PSNR metrics, in addition to train and val losses.
+
+    It uses Lightning's `self.log` method to log metrics, so 
+    accumulation/distributed logging is handled by lightning.
+
+    Args:
+        num_steps (list[int]): List of number of steps to log metrics for.
+    """
+    def __init__(
+        self, 
+        num_steps: list[int],
+    ):
+        super().__init__()
+        self.num_steps = num_steps
+        self.device = None  # delay initialization
+        self.metrics = None  # delay initialization
+    
+    def setup(self, trainer: Trainer, pl_module: TrainingPipeline, stage=None) -> None:
+        assert isinstance(trainer.logger, loggers.NeptuneLogger)
+
+        self.device = pl_module.device
+
+        metrics: dict[str, Metric] = {}
+        for n in self.num_steps:
+            metrics[f"lpips_{n}"] = LearnedPerceptualImagePatchSimilarity().to(self.device)
+            metrics[f"dists_{n}"] = DeepImageStructureAndTextureSimilarity().to(self.device)
+            metrics[f"psnr_{n}"] = PeakSignalNoiseRatio((-1.0, 1.0)).to(self.device)
+
+        self.metrics = MetricCollection(metrics).to(self.device)
+    
+    @rank_zero_only
+    def on_train_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline,
+        outputs: Dict[str, Any],
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        self.log("train/loss", outputs["loss"])
+
+    def on_validation_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline,
+        outputs: Dict[str, Any],
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        self.log("val/loss", outputs["loss"], on_epoch=True, sync_dist=True)
+
+        # Infer the samples
+        samples = pl_module.log_samples(batch)
+
+        samples_by_steps = {
+            step: samples[f"samples_{step}_steps"] 
+            for step in self.num_steps 
+            if f"samples_{step}_steps" in samples
+        }
+
+        # Run the metrics        
+        for metric_key in self.metrics:
+            # predictions in lbm_model.py are named f"samples_{num_step}_steps"
+            n_steps = int(metric_key.split("_")[-1])
+            pred = samples_by_steps.get(n_steps, None)
+            if pred is None:
+                logging.warning(f"Key f'samples_{n_steps}_steps' not found in outputs. Skipping metric {metric_key}.")
+                continue
+            pred = pred.clamp(-1, 1)
+            metric = self.metrics[metric_key]
+            gt = batch[pl_module.model.target_key]
+
+            metric.update(pred.to(self.device), gt.to(self.device))
+        
+        # Visualize the images
+        grids = self._build_grids(
+            batch, 
+            samples_by_steps=samples_by_steps, 
+            log_keys=pl_module.log_keys,
+            source_key=pl_module.model.source_key,
+            uid_key="uid"
+        )
+
+        gathered_imgs = self._gather_dict_on_rank0(grids)
+
+        if dist.get_rank() == 0:
+            assert gathered_imgs is not None
+            for image_key in gathered_imgs.keys():
+                image = gathered_imgs[image_key]
+                # rescale from [-1, 1] to [0, 1]
+                image = (image / 2 + 0.5).clamp(0, 1)
+                neptune_file = File.as_image(image.cpu().squeeze().permute(1, 2, 0).clip(0, 1))
+                # only compatible with neptune logger
+                trainer.logger.experiment[f"val/{image_key}"].append(neptune_file)
+
+    def _gather_dict_on_rank0(self, local_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        if not dist.is_initialized():
+            return local_dict  # single-process case
+
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+
+        # Each process sends its dict
+        gathered = [None for _ in range(world_size)] if rank == 0 else None
+        dist.gather_object(local_dict, gathered, dst=0)
+
+        if rank == 0:
+            # Merge into a single dict of Tensors
+            merged = {}
+            for d in gathered:
+                for k, v in d.items():
+                    if k not in merged:
+                        merged[k] = v.cpu()
+                    else:
+                        logging.warning(f"Key {k} already exists in merged dict. Dropping duplicate.")
+            return merged
+        else:
+            return None
+
+    def on_validation_epoch_end(
+        self,
+        trainer: Trainer,
+        pl_module: TrainingPipeline
+    ):
+        output = self.metrics.compute()
+        for key, value in output.items():
+            self.log(f"val/{key}", value, sync_dist=True)
+        self.metrics.reset()
+    
+    def _build_grids(
+        self, 
+        batch: Dict[str, Any], 
+        samples_by_steps: Dict[int, Any], 
+        log_keys: List[str],
+        source_key: str,
+        uid_key: str,
+    ) -> Dict[str, Any]:
+        """
+        Build a 3 rows visualization grid for each image in the batch.
+        1st row: input images (log_keys)
+        2nd row: predicted images (for each num_steps)
+        3rd row: column-wise mixed predicted and input images (for each num_steps)
+        """
+        output_grids: Dict[str, Any] = {}
+        assert uid_key in batch, f"uid_key {uid_key} not in batch"
+
+        batch_size, _, h, w = list(samples_by_steps.values())[0].shape
+        shape = (1, 3, h, w)
+
+        nrow = max(len(log_keys), len(self.num_steps))
+        
+        for image_index in range(0, batch_size):
+            grid_image: list[torch.Tensor] = []
+
+            first_row = []
+            for key_index in range(0, nrow):
+                if key_index < len(log_keys):
+                    cell = batch[log_keys[key_index]][image_index:image_index+1].to(self.device)
+                else:
+                    cell = torch.zeros(shape, device=self.device)  # pad with black images
+
+                assert cell.shape == shape, f"Cell shape {cell.shape} does not match expected shape {shape}"
+                first_row.append(cell)
+
+            grid_image.extend(first_row)
+
+            second_row = []
+            third_row = []
+            for key_index in range(0, nrow):
+                if key_index < len(self.num_steps):
+                    pred = samples_by_steps[self.num_steps[key_index]][image_index:image_index+1].to(self.device)
+                    mix = self._mix_images_column_wise(pred, batch[source_key][image_index:image_index+1]).to(self.device)
+                else:
+                    pred = torch.zeros(shape, device=self.device)  # pad with black images
+                    mix = torch.zeros(shape, device=self.device)  # pad with black images
+
+                assert pred.shape == shape, f"Cell shape {pred.shape} does not match expected shape {shape}"
+                second_row.append(pred)
+                third_row.append(mix)
+
+            grid_image.extend(second_row)
+            grid_image.extend(third_row)
+
+            grid = torch.cat(grid_image, dim=0)
+
+            image_key = batch[uid_key][image_index].replace("/", "_")
+            output_grids[f"image_{image_key}"] = make_grid(
+                grid,
+                nrow=nrow
+            )
+
+        return output_grids
+    
+    def _mix_images_column_wise(self, a: torch.Tensor, b: torch.Tensor, column_width: int = 5) -> torch.Tensor:
+        """
+        Mix two batched images column-wise along width.
+
+        Args:
+            a (torch.Tensor): Tensor of shape (b, c, h, w)
+            b (torch.Tensor): Tensor of shape (b, c, h, w)
+            column_width (int): Width (in pixels) of each alternating column block.
+
+        Returns:
+            torch.Tensor: Mixed tensor of shape (b, c, h, w)
+        """
+        assert a.shape == b.shape, "Inputs must have the same shape"
+        assert a.ndim == 4, "Inputs must be 4D tensors (b, c, h, w)"
+        _, _, _, w = a.shape
+
+
+        device = a.device
+        dtype = a.dtype
+
+
+        b = b.to(device=device, dtype=dtype)
+
+
+        # Build mask pattern [1, 1, 0, 0, 1, 1, 0, 0, ...] along width dimension
+        mask = torch.zeros(w, dtype=torch.bool, device=device)
+        toggle = True
+        for x in range(0, w, column_width):
+            x_end = min(x + column_width, w)
+            mask[x:x_end] = toggle
+            toggle = not toggle
+
+
+        # with shape (1, 1, 1, w) it broadcasts mask to (b, c, h, w)
+        mask = mask.view(1, 1, 1, w)
+
+
+        return torch.where(mask, a, b)
 
 def get_model(
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
@@ -291,7 +538,8 @@ def get_filter_mappers(
                         seed_key="uid"
                     )
                 ),
-                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization
+                RescaleMapper(RescaleMapperConfig(key="mask", verbose=True)), # for visualization only
+                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization only
                 RescaleMapper(RescaleMapperConfig(key="before_masked", verbose=True)),
                 RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
 
@@ -537,6 +785,7 @@ def main(
         raise ValueError("No GPU available for training.")
 
     trainer = Trainer(
+        log_every_n_steps=10,
         accelerator="gpu",
         devices=n_gpus,
         num_nodes=1,
@@ -546,6 +795,9 @@ def main(
             project=neptune_project, name=run_name, log_model_checkpoints=False
         ),
         callbacks=[
+            EraserLogger(
+                num_steps=num_steps
+            ),
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
