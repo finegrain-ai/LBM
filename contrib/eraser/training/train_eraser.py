@@ -154,7 +154,7 @@ class EraserLogger(Callback):
                 image = (image / 2 + 0.5).clamp(0, 1)
                 neptune_file = File.as_image(image.cpu().squeeze().permute(1, 2, 0).clip(0, 1))
                 # only compatible with neptune logger
-                trainer.logger.experiment[f"val/{image_key}"].append(neptune_file)
+                trainer.logger.experiment[f"val/{image_key}"].append(neptune_file, step=trainer.global_step)
 
     def _gather_dict_on_rank0(self, local_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         if not dist.is_initialized():
@@ -808,7 +808,7 @@ def main(
         num_sanity_val_steps=0,
         precision="bf16-mixed",
         limit_val_batches=2, # 2 x 4 (batch_size) x 8 GPUs = 64 samples for validation
-        val_check_interval=250, # 250 means every 4 (batch) * 8 (gpus) * 250 = 8000 training samples
+        val_check_interval=5, # 250 means every 4 (batch) * 8 (gpus) * 250 = 8000 training samples
         max_epochs=max_epochs,
     )
 
