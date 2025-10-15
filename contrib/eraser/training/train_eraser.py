@@ -63,7 +63,7 @@ class EraserLogger(Callback):
 
     Log LPIPS, DISTS, PSNR metrics, in addition to train and val losses.
 
-    Use lightning self.log function to log metrics, so 
+    It uses Lightning's `self.log` method to log metrics, so 
     accumulation/distributed logging is handled by lightning.
 
     Args:
