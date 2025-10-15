@@ -68,21 +68,20 @@ class EraserLogger(Callback):
 
     Args:
         num_steps (list[int]): List of number of steps to log metrics for.
-        device (torch.device): Device to use for metrics computation.
     """
     def __init__(
         self, 
-        num_steps: list[int], 
-        device: torch.device | None = None, 
+        num_steps: list[int],
     ):
         super().__init__()
         self.num_steps = num_steps
-        self.device = device  # can be None; we’ll set it dynamically
+        self.device = None  # delay initialization
         self.metrics = None  # delay initialization
-
+    
     def setup(self, trainer: Trainer, pl_module: TrainingPipeline, stage=None) -> None:
-        if self.device is None:
-            self.device = pl_module.device
+        assert isinstance(trainer.logger, loggers.NeptuneLogger)
+
+        self.device = pl_module.device
 
         metrics: dict[str, Metric] = {}
         for n in self.num_steps:
