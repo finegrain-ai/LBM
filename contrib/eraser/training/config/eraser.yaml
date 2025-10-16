@@ -24,9 +24,19 @@ batch_size: 4
 learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW
 num_steps: [1, 4]
-log_interval: 500
-resume_from_checkpoint: false
+log_interval: 10 # log the loss/lr every 10 steps
 max_epochs: 50
-save_interval: 5000
-save_ckpt_path: ./checkpoints
 gradient_clip_val: null
+
+# Validation
+limit_val_batches: 2 # 2 x 4 (batch_size) x 8 GPUs = 64 samples for validation
+val_check_interval: 500 # 500 means every 4 (batch) * 8 (gpus) * 500 = 16000 training samples
+
+# Checkpointing
+resume_from_checkpoint: false
+save_interval: 500 # synced with val_check_interval
+# Each checkpoint is 5.1GB, 25 checkpoints = 125GB
+# 25 * 500 = 12500 last steps are covered
+save_top_k: 25
+save_ckpt_path: ./checkpoints
+
