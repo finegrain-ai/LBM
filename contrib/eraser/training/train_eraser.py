@@ -44,6 +44,10 @@ from lbm.data.mappers import (
     TorchvisionMapperConfig,
     RandomPixelMasking,
     RandomPixelMaskingConfig,
+    ResizeMod,
+    ResizeModConfig,
+    RandomMask,
+    RandomMaskConfig,
 )
 from lbm.models.embedders import (
     ConditionerWrapper,
@@ -477,83 +481,58 @@ def get_model(
 
     return model
 
-def get_filter_mappers(
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
-) -> list[MapperWrapper | KeyFilter]:
-
-    match resize_mode:
-        case "CenterCrop":
-            resize_args = {
-                "size": image_size,
-            }
-        case "Resize":
-            resize_args = {
-                "size": image_size,
-                "interpolation": InterpolationMode.NEAREST_EXACT,
-            }
-        case _:
-            raise ValueError(f"Unsupported resize_mode: {resize_mode}")
-        
-        
+def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
     filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
+        KeyFilter(KeyFilterConfig(keys=["jpg", "__key__"], verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
                     KeyRenameMapperConfig(
                         key_map={
-                            "before.jpg": "before",
-                            "after.jpg": "after",
-                            "mask.png": "mask",
+                            "jpg": "after",
                             "__key__": "uid",
                         }
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
-                        key="before",
-                        transforms=["ToTensor", resize_mode],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                        ],
-                    )
-                ),
-                TorchvisionMapper(
-                    TorchvisionMapperConfig(
                         key="after",
-                        transforms=["ToTensor", resize_mode],
+                        transforms=["ToTensor"],
                         transforms_kwargs=[
-                            {},
-                            resize_args,
+                            {}
                         ],
                     )
                 ),
-                TorchvisionMapper(
-                    TorchvisionMapperConfig(
-                        key="mask",
-                        transforms=["ToTensor", resize_mode, "Normalize"],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                            {"mean": 0.0, "std": 1.0},
-                        ],
+                ResizeMod(
+                    ResizeModConfig(
+                        key="after", 
+                        resolution=resolution, 
+                        size_output_key="image_size"
+                    )
+                ),
+                RandomMask(
+                    RandomMaskConfig(
+                        key="after",
+                        output_key="mask",
+                        # webdataset usually loads 3-channel images even for grayscale image
+                        # Using 3 channels here will be more convenient to share code 
+                        # Between Erasing datasets and Inpainting datasets
+                        channels=3, 
+                        seed_key="uid",
                     )
                 ),
                 # Random pixel masking is made on [0, 1] tensors (before RescaleMapper)
                 RandomPixelMasking(
                     RandomPixelMaskingConfig(
-                        key="before",
+                        key="after",
                         mask_key="mask",
-                        output_key="before_masked",
+                        output_key="before",
                         verbose=True,
                         seed_key="uid"
                     )
                 ),
                 RescaleMapper(RescaleMapperConfig(key="mask", verbose=True)), # for visualization only
                 RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization only
-                RescaleMapper(RescaleMapperConfig(key="before_masked", verbose=True)),
                 RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
 
             ],
@@ -567,12 +546,11 @@ def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
     batch_size: int,
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
+    resolution: int,
 ):
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    train_filters_mappers = get_filter_mappers(resolution=resolution)
 
     # unbrace urls
     train_shards_path_or_urls_unbraced = []
@@ -603,7 +581,7 @@ def get_data_module(
     )
 
     # VALIDATION
-    validation_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    validation_filters_mappers = get_filter_mappers(resolution=resolution)
 
     # unbrace urls
     validation_shards_path_or_urls_unbraced = []
@@ -642,7 +620,7 @@ def main(
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
-    source_key: str = "before_masked",
+    source_key: str = "before",
     target_key: str = "after",
     neptune_project: str = "LBM-Eraser",
     batch_size: int = 8,
@@ -675,8 +653,7 @@ def main(
     val_check_interval: int = 1000,
     save_top_k: int = 1,
     path_config: str = None,
-    image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
-    resize_mode: str = "Resize" # CenterCrop or Resize
+    resolution: int = 256,
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -697,17 +674,12 @@ def main(
         conditioning_masks_keys=conditioning_masks_keys,
         bridge_noise_sigma=bridge_noise_sigma,
     )
-
-    if isinstance(image_size, list):
-        assert len(image_size) == 2, "image_size must be a tuple of (height, width)"
-        image_size = tuple(image_size)
-
+    
     data_module = get_data_module(
         train_shards=train_shards,
         validation_shards=validation_shards,
         batch_size=batch_size,
-        image_size=image_size,
-        resize_mode=resize_mode,
+        resolution=resolution
     )
 
     train_parameters = ["denoiser.*"]
