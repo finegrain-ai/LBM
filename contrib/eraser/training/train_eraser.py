@@ -44,6 +44,8 @@ from lbm.data.mappers import (
     TorchvisionMapperConfig,
     RandomPixelMasking,
     RandomPixelMaskingConfig,
+    ResizeAndCenterCrop,
+    ResizeAndCenterCropConfig,
 )
 from lbm.models.embedders import (
     ConditionerWrapper,
@@ -138,7 +140,7 @@ class EraserLogger(Callback):
                 continue
             pred = pred.clamp(-1, 1)
             metric = self.metrics[metric_key]
-            gt = batch[pl_module.model.target_key]
+            gt = batch[pl_module.model.target_key].clamp(-1, 1)
 
             metric.update(pred.to(self.device), gt.to(self.device))
         
@@ -480,68 +482,52 @@ def get_model(
 
 def get_filter_mappers(
     image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
+    img_extension: str = ".jpg",
+    mask_extension: str = ".png",
 ) -> list[MapperWrapper | KeyFilter]:
-
-    match resize_mode:
-        case "CenterCrop":
-            resize_args = {
-                "size": image_size,
-            }
-        case "Resize":
-            resize_args = {
-                "size": image_size,
-                "interpolation": InterpolationMode.NEAREST_EXACT,
-            }
-        case _:
-            raise ValueError(f"Unsupported resize_mode: {resize_mode}")
-        
-        
+    
+    key_map = {
+        f"before{img_extension}": "before",
+        f"after{img_extension}": "after",
+        f"mask{mask_extension}": "mask",
+        f"__key__": "uid"
+    }
     filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
+        KeyFilter(KeyFilterConfig(keys=key_map.keys(), verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
                     KeyRenameMapperConfig(
-                        key_map={
-                            "before.jpg": "before",
-                            "after.jpg": "after",
-                            "mask.png": "mask",
-                            "__key__": "uid",
-                        }
+                        key_map=key_map
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="before",
-                        transforms=["ToTensor", resize_mode],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                        ],
+                        transforms=["ToTensor"],
+                        transforms_kwargs=[{}],
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="after",
-                        transforms=["ToTensor", resize_mode],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                        ],
+                        transforms=["ToTensor"],
+                        transforms_kwargs=[{}],
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="mask",
-                        transforms=["ToTensor", resize_mode, "Normalize"],
+                        transforms=["ToTensor", "Normalize"],
                         transforms_kwargs=[
                             {},
-                            resize_args,
-                            {"mean": 0.0, "std": 1.0},
+                            {"mean": 0.0, "std": 1.0}
                         ],
                     )
                 ),
+                ResizeAndCenterCrop(ResizeAndCenterCropConfig(key="before",image_size=image_size)),
+                ResizeAndCenterCrop(ResizeAndCenterCropConfig(key="after",image_size=image_size)),
+                ResizeAndCenterCrop(ResizeAndCenterCropConfig(key="mask",image_size=image_size)),
                 # Random pixel masking is made on [0, 1] tensors (before RescaleMapper)
                 RandomPixelMasking(
                     RandomPixelMaskingConfig(
@@ -567,13 +553,17 @@ def get_filter_mappers(
 def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
+    train_img_extension: str,
+    val_img_extension: str,
     batch_size: int,
     image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
-):
+) -> DataModule:
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    train_filters_mappers = get_filter_mappers(
+        image_size=image_size,
+        img_extension=train_img_extension
+    )
 
     # unbrace urls
     train_shards_path_or_urls_unbraced = []
@@ -605,7 +595,10 @@ def get_data_module(
     )
 
     # VALIDATION
-    validation_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    validation_filters_mappers = get_filter_mappers(
+        image_size=image_size,
+        img_extension=val_img_extension
+    )
 
     # unbrace urls
     validation_shards_path_or_urls_unbraced = []
@@ -678,7 +671,8 @@ def main(
     save_top_k: int = 1,
     path_config: str = None,
     image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
-    resize_mode: str = "Resize" # CenterCrop or Resize
+    train_img_extension: str = ".jpg",
+    val_img_extension: str = ".jpg",
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -709,7 +703,8 @@ def main(
         validation_shards=validation_shards,
         batch_size=batch_size,
         image_size=image_size,
-        resize_mode=resize_mode,
+        train_img_extension=train_img_extension,
+        val_img_extension=val_img_extension
     )
 
     train_parameters = ["denoiser.*"]

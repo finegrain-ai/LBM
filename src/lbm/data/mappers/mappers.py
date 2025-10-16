@@ -1,5 +1,6 @@
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
+from numpy import size
 from torchvision import transforms
 import torchvision.transforms.functional as F
 import torch
@@ -9,7 +10,8 @@ from .mappers_config import (
     KeyRenameMapperConfig,
     RescaleMapperConfig,
     TorchvisionMapperConfig,
-    RandomPixelMaskingConfig
+    RandomPixelMaskingConfig,
+    ResizeAndCenterCropConfig
 )
 from torch import Tensor
 
@@ -169,3 +171,44 @@ class RandomPixelMasking(BaseMapper):
         
         noise = torch.empty_like(image).uniform_(generator=generator)
         return image * (1 - mask) + noise * mask
+
+class ResizeAndCenterCrop(BaseMapper):
+    """
+    Resize/Center-Crop the image so we do not stretch the pixel.
+
+    Args:
+        config (ResizeAndCenterCropConfig): Configuration for the mapper
+    """
+
+    def __init__(self, config: ResizeAndCenterCropConfig):
+        super().__init__(config)
+
+    def __call__(self, batch: Dict[str, Any], *args, **kwrags) -> Dict[str, Any]:
+        batch[self.output_key] = self._process(
+            image=batch[self.config.key],
+            size=self.config.image_size,
+            interpolation=self.config.interpolation,
+        )
+        return batch
+
+    def _process(
+        self, 
+        image: Tensor, 
+        size: Tuple[int, int], # h, w
+        interpolation: transforms.InterpolationMode
+    ) -> Tensor:
+        target_height, target_width = size
+        target_ratio = target_width / target_height
+        image_width, image_height = F.get_image_size(image)
+        image_ratio = image_width / image_height
+        if image_ratio > target_ratio:
+            # Image is wider than target ratio, resize based on height
+            new_height = target_height
+            new_width = int(target_height * image_ratio)
+        else:
+            # Image is taller than target ratio, resize based on width
+            new_width = target_width
+            new_height = int(target_width / image_ratio)
+
+        image = F.resize(image, size=(new_height, new_width), interpolation=self.config.interpolation)
+        return F.center_crop(image, size)

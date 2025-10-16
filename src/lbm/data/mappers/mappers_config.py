@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from torchvision import transforms
 
 from pydantic.dataclasses import dataclass
 
@@ -122,3 +123,17 @@ class RandomPixelMaskingConfig(BaseMapperConfig):
     key: str = "image"
     mask_key: str = "mask"
     seed_key: str | None = None
+
+class ResizeAndCenterCropConfig(BaseMapperConfig):
+    """
+    Resize/Center-Crop the image so we do not stretch the pixel.
+
+    Args:
+        key (str): Key to apply the resizing and cropping to.
+        image_size (Tuple[int, int]): Size of the output image (height, width).
+        interpolation (int): Interpolation mode to use for resizing. Defaults to `PIL.Image.NEAREST`.
+    """
+
+    key: str = "image"
+    image_size: Tuple[int, int] = (480, 640)  # (H, W)
+    interpolation: transforms.InterpolationMode = transforms.InterpolationMode.NEAREST
