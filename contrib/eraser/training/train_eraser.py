@@ -44,6 +44,8 @@ from lbm.data.mappers import (
     TorchvisionMapperConfig,
     RandomPixelMasking,
     RandomPixelMaskingConfig,
+    CropMod,
+    CropModConfig,
 )
 from lbm.models.embedders import (
     ConditionerWrapper,
@@ -511,6 +513,13 @@ def get_filter_mappers(
                         }
                     )
                 ),
+                CropMod(CropModConfig(
+                    key="before", 
+                    # for bucketing, we extract size from the before image only
+                    size_output_key="image_size"
+                )),
+                CropMod(CropModConfig(key="after")),
+                CropMod(CropModConfig(key="mask")),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="before",

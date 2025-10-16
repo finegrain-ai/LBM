@@ -122,3 +122,19 @@ class RandomPixelMaskingConfig(BaseMapperConfig):
     key: str = "image"
     mask_key: str = "mask"
     seed_key: str | None = None
+
+class CropModConfig(BaseMapperConfig):
+    """
+    Crop the input so that its height and width are multiples of a given number.
+
+    Args:
+
+        key (str): Key to apply the cropping to.
+        mod (int): The multiple to crop to. Default is 8.
+        size_output_key (Optional[str]): Key to store the resulting size (height, width) of the cropped image.
+            If None, the size is not stored. Default is None.
+    """
+
+    key: str = "image"
+    mod: int = 8
+    size_output_key: Optional[str] = None

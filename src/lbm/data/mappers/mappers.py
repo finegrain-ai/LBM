@@ -1,3 +1,4 @@
+from ast import Tuple
 from typing import Any, Dict
 
 from torchvision import transforms
@@ -8,6 +9,7 @@ from .base import BaseMapper
 from .mappers_config import (
     KeyRenameMapperConfig,
     RescaleMapperConfig,
+    CropModConfig,
     TorchvisionMapperConfig,
     RandomPixelMaskingConfig
 )
@@ -169,3 +171,32 @@ class RandomPixelMasking(BaseMapper):
         
         noise = torch.empty_like(image).uniform_(generator=generator)
         return image * (1 - mask) + noise * mask
+
+class CropMod(BaseMapper):
+    """
+    Crop the input so that its height and width are multiples of a given number.
+
+    Args:
+
+        config (CropModConfig): Configuration for the mapper
+    """
+
+    def __init__(self, config: CropModConfig):
+        super().__init__(config)
+        self.mod = config.mod
+
+    def __call__(self, batch: Dict[str, Any], *args, **kwrags) -> Dict[str, Any]:
+        if self.key in batch:
+            cropped_image, size = self._process(batch[self.key])
+            batch[self.output_key] = cropped_image
+            if self.config.size_output_key:
+                batch[self.config.size_output_key] = size
+        return batch
+
+    def _process(self, image: Tensor) -> Tuple[Tensor, Tuple[int, int]]:
+        _, _, h, w = image.shape
+        new_h = (h + self.mod - 1) // self.mod * self.mod
+        new_w = (w + self.mod - 1) // self.mod * self.mod
+        if new_h != h or new_w != w:
+            image = F.center_crop(image, (new_h, new_w))
+        return image, (h, w)
