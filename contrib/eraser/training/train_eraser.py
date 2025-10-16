@@ -589,15 +589,14 @@ def get_data_module(
     train_data_config = DataModuleConfig(
         shards_path_or_urls=train_shards_path_or_urls_unbraced,
         decoder="pil",
-        # RORD dataset contains 500K images in 500 shards
-        # And we are training with 8 GPUs
-        # 200 out of 500 shards
-        shuffle_before_split_by_node_buffer_size=min(200, len(train_shards_path_or_urls_unbraced)),  
-        # Each node has 500/8 ~ 60 shards, so 30 looks fine
-        shuffle_before_split_by_workers_buffer_size=30,
-        # 10 workers means each worker sees ~ 6 shards = 6k samples
-        # Set it to 2k
-        shuffle_before_filter_mappers_buffer_size=2000,
+        # RORD dataset contains 400K images in 400 shards
+        # 200 out of 400 shards
+        shuffle_before_split_by_node_buffer_size=min(200, len(train_shards_path_or_urls_unbraced)),
+        # Each node has 400/4 ~ 100 shards, so 30 looks fine
+        shuffle_before_split_by_workers_buffer_size=50,
+        # 10 workers means each worker sees ~ 10 shards = 10k samples
+        # Set it to 4k
+        shuffle_before_filter_mappers_buffer_size=4000,
         # not needed to shuffle after filter mappers
         shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
