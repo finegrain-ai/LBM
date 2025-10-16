@@ -32,7 +32,7 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModule, DataModuleConfig
+from lbm.data.datasets import DataModule, DataModuleConfig, BucketingConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
 from lbm.data.mappers import (
     KeyRenameMapper,
@@ -587,6 +587,12 @@ def get_data_module(
         shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
+        bucketing=BucketingConfig(
+            bucket_key="image_size",
+            # RORD dataset should have only 1 aspect ratio
+            max_buckets=1, 
+            partial=False
+        )
     )
 
     # VALIDATION
@@ -610,6 +616,12 @@ def get_data_module(
         shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
+        bucketing=BucketingConfig(
+            bucket_key="image_size",
+            # RORD dataset should have only 1 aspect ratio
+            max_buckets=1, 
+            partial=False
+        )
     )
 
     # data module
