@@ -78,7 +78,7 @@ def main() -> None:
         shard_path = args.out_dir / f"{args.prefix}-{i:04d}.tar"
         print(f"🧩 Writing {shard_path} with {end - start} samples...")
 
-        with tarfile.open(shard_path, "w") as tar:
+        with tarfile.open(shard_path, "w", dereference=True) as tar:
             for idx, (img, gt, mask, stem) in enumerate(triples[start:end], start=start + 1):
                 base = str(idx)
                 tar.add(img, arcname=f"{base}-{stem}.before.png")
