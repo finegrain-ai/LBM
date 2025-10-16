@@ -18,7 +18,7 @@ resize_mode: CenterCrop # CenterCrop or Resize
 train_shards: 
 - "data/RORD-processed/train-{000000..000412}.tar"
 validation_shards: 
-- "data/RORD-processed/val-lite-{000000..000007}.tar" # 8 shards, one per GPU
+- "data/BaiLing/RemovalBench-{0000..0007}.tar" # 8 shards, one per GPU
 
 batch_size: 4
 learning_rate: 3e-5 # see Appendix A.1

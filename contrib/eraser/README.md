@@ -22,12 +22,12 @@ uv run --script contrib/eraser/datasets/preprocess_rord.py
 
 Result is saved in `data/RORD-processed/` (auto-created if not existing)
 
-### Export a "lite" validation set
+### Prepare the RemovalBench validation dataset
 
-To improve the diversity of the validation set, we create a `val-lite` version of it, by choosing only one frame per scene in RORD validation set.
-
+As a validation set, we use [BaiLing/RemovalBench](https://huggingface.co/datasets/BaiLing/RemovalBench/tree/main) dataset from [OmniEraser](https://arxiv.org/abs/2501.07397).
+We first format it to webdataset in 8 shards (for 8 GPUs).
 ```
-uv run --script contrib/eraser/datasets/extract_val_lite.py
+uv run --script contrib/eraser/datasets/removalbench_webdataset.py
 ```
 
 ## Train
