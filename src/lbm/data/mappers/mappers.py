@@ -11,7 +11,8 @@ from .mappers_config import (
     RescaleMapperConfig,
     CropModConfig,
     TorchvisionMapperConfig,
-    RandomPixelMaskingConfig
+    RandomPixelMaskingConfig,
+    RandomAspectRatioConfig
 )
 from torch import Tensor
 
@@ -200,3 +201,60 @@ class CropMod(BaseMapper):
         if new_h != h or new_w != w:
             image = F.center_crop(image, (new_h, new_w))
         return image, (h, w)
+
+class RandomAspectRatio(BaseMapper):
+    """
+    Randomly change the aspect ratio to a target aspect ratio sampled from a list of aspect ratios.
+
+    Args:
+
+        config (RandomAspectRatioConfig): Configuration for the mapper
+    """
+
+    def __init__(self, config: RandomAspectRatioConfig):
+        super().__init__(config)
+        self.aspect_ratios = config.aspect_ratios
+        assert self.aspect_ratios is not None and len(self.aspect_ratios) > 0, "aspect_ratios must be a non-empty list"
+        self.seed_key = config.seed_key
+
+        if config.weights is not None:
+            assert len(config.weights) == len(self.aspect_ratios), "weights must have the same length as aspect_ratios"
+            self.weights = torch.tensor(config.weights, dtype=torch.float32)
+            self.weights = self.weights / self.weights.sum()
+        else:
+            # uniform weights
+            self.weights = torch.ones(len(self.aspect_ratios), dtype=torch.float32) / len(self.aspect_ratios)
+
+    def __call__(self, batch: Dict[str, Any], *args, **kwrags) -> Dict[str, Any]:
+        if self.key in batch:
+            batch[self.output_key] = self._process(
+                image=batch[self.key],
+                seed=batch[self.seed_key] if self.seed_key and self.seed_key in batch else None,
+            )
+        return batch
+
+    def _seed_from_string(self, s: str) -> int:
+        return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)
+
+    def _process(self, image: Tensor, seed: str | None) -> Tensor:
+
+        if seed:
+            generator = torch.Generator(device=image.device)
+            generator.manual_seed(self._seed_from_string(seed))
+        else:
+            generator = None
+
+        aspect_ratio = self.aspect_ratios[torch.multinomial(self.weights, 1, generator=generator).item()]
+
+        _, _, h, w = image.shape
+        image_aspect_ratio = w / h
+        # We crop the image to the new aspect ratio
+        # not resizing to avoid upscaling
+        if aspect_ratio >= image_aspect_ratio:
+            new_w = w
+            new_h = int(w / aspect_ratio)
+        else:
+            new_h = h
+            new_w = int(h * aspect_ratio)
+
+        return F.center_crop(image, (new_h, new_w))

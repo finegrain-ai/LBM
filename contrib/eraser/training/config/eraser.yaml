@@ -18,6 +18,14 @@ train_shards:
 validation_shards: 
 - "data/RORD-processed/val-lite-{000000..000007}.tar" # 8 shards, 2 per GPU
 
+# 50% original aspect ratio
+# 20% 1.5 aspect ratio
+# 20% 1.2 aspect ratio
+# 10% 1.0 aspect ratio (square)
+# We limit square it can result to more "no visible mask" cases
+train_aspect_ratios: [None, 1.5, 1.2, 1.0] 
+train_aspect_ratios_weights: [0.5, 0.2, 0.2, 0.1]
+
 batch_size: 8
 learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW

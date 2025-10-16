@@ -46,7 +46,10 @@ from lbm.data.mappers import (
     RandomPixelMaskingConfig,
     CropMod,
     CropModConfig,
+    RandomAspectRatio,
+    RandomAspectRatioConfig,
 )
+from lbm.data.mappers.base import BaseMapper
 from lbm.models.embedders import (
     ConditionerWrapper,
     LatentsConcatEmbedder,
@@ -480,7 +483,26 @@ def get_model(
 
     return model
 
-def get_filter_mappers() -> list[MapperWrapper | KeyFilter]:
+def get_filter_mappers(
+    aspect_ratios: Optional[list[float | None]] = None,
+    aspect_ratio_weights: Optional[list[float]] = None,
+) -> list[MapperWrapper | KeyFilter]:
+
+    augmentations : list[BaseMapper] = []
+    if aspect_ratios is not None:
+        augmentations.append(
+            RandomAspectRatio(
+                RandomAspectRatioConfig(
+                    keys=["before", "after", "mask"],
+                    aspect_ratios=aspect_ratios,
+                    output_keys=["before", "after", "mask"],
+                    verbose=True,
+                    seed_key="uid",
+                    weights=aspect_ratio_weights
+                )
+            )
+        )
+
     filters_mappers = [
         KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
         MapperWrapper(
@@ -495,6 +517,7 @@ def get_filter_mappers() -> list[MapperWrapper | KeyFilter]:
                         }
                     )
                 ),
+                *augmentations,
                 CropMod(CropModConfig(
                     key="before", 
                     # for bucketing, we extract size from the before image only
@@ -556,10 +579,15 @@ def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
     batch_size: int,
+    train_aspect_ratios: Optional[list[float | None]] = None,
+    train_aspect_ratios_weights: Optional[list[float]] = None,
 ):
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers()
+    train_filters_mappers = get_filter_mappers(
+        aspect_ratios=train_aspect_ratios,
+        aspect_ratio_weights=train_aspect_ratios_weights,
+    )
 
     # unbrace urls
     train_shards_path_or_urls_unbraced = []
@@ -674,6 +702,8 @@ def main(
     val_check_interval: int = 1000,
     save_top_k: int = 1,
     path_config: str = None,
+    train_aspect_ratios: Optional[list[float | None]] = None,
+    train_aspect_ratios_weights: Optional[list[float]] = None,
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -699,6 +729,8 @@ def main(
         train_shards=train_shards,
         validation_shards=validation_shards,
         batch_size=batch_size,
+        train_aspect_ratios=train_aspect_ratios,  # RORD dataset has only one aspect ratio
+        train_aspect_ratios_weights=train_aspect_ratios_weights,
     )
 
     train_parameters = ["denoiser.*"]

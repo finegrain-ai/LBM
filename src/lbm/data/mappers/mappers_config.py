@@ -138,3 +138,48 @@ class CropModConfig(BaseMapperConfig):
     key: str = "image"
     mod: int = 8
     size_output_key: Optional[str] = None
+
+class RandomAspectRatioConfig(BaseMapperConfig):
+    """
+    Randomly change the aspect ratio of an image by a factor sampled from a given list of aspect ratios.
+
+    Args:
+
+        keys (list[str]): Keys to apply the aspect ratio change to.
+        output_keys (Optional[list[str]]): 
+            Keys to store the resulting images with changed aspect ratios
+            If None, the output will overwrite the input keys. Default is None.
+        aspect_ratios (list[float | None]): 
+            List of aspect ratio (w/h) factors to sample from.
+            If None is included in the list, the original aspect ratio may be kept.
+        seed_key (Optional[str]): Key containing the seed to use for random number generation.
+        weights (Optional[list[float]]):
+            Weights for sampling the aspect ratios. If None, uniform sampling is used. Default is None.
+    """
+
+    keys: list[str] = None
+    output_keys: Optional[list[str]] = None
+    aspect_ratios: list[float | None] = None
+    seed_key: Optional[str] = None
+    weights: Optional[list[float]] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.keys is not None and len(self.keys) > 0, "keys must be a non-empty list"
+        if self.output_keys is not None:
+            assert len(self.output_keys) == len(self.keys), "output_keys must have the same length as keys"
+        if self.aspect_ratios is None or len(self.aspect_ratios) == 0:
+            raise ValueError("aspect_ratios must be a non-empty list")
+        assert all(
+            ar is None or (isinstance(ar, (float, int)) and ar > 0)
+            for ar in self.aspect_ratios
+        ), "aspect_ratios must be a list of positive numbers or None"
+
+        if self.weights is not None:
+            assert len(self.weights) == len(self.aspect_ratios), "weights must have the same length as aspect_ratios"
+            assert all(w >= 0 for w in self.weights), "weights must be non-negative"
+            if sum(self.weights) == 0:
+                raise ValueError("At least one weight must be positive")
+
+        if self.seed_key is not None:
+            assert isinstance(self.seed_key, str), "seed_key must be a string"
