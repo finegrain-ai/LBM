@@ -27,7 +27,7 @@ Result is saved in `data/RORD-processed/` (auto-created if not existing)
 As a validation set, we use [BaiLing/RemovalBench](https://huggingface.co/datasets/BaiLing/RemovalBench/tree/main) dataset from [OmniEraser](https://arxiv.org/abs/2501.07397).
 We first format it to webdataset in 8 shards (for 8 GPUs).
 ```
-uv run --script contrib/eraser/datasets/removalbench_webdataset.py
+uv run --script contrib/eraser/datasets/preprocess_removalbench.py
 ```
 
 ## Train
