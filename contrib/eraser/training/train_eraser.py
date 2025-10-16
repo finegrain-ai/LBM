@@ -480,25 +480,7 @@ def get_model(
 
     return model
 
-def get_filter_mappers(
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
-) -> list[MapperWrapper | KeyFilter]:
-
-    match resize_mode:
-        case "CenterCrop":
-            resize_args = {
-                "size": image_size,
-            }
-        case "Resize":
-            resize_args = {
-                "size": image_size,
-                "interpolation": InterpolationMode.NEAREST_EXACT,
-            }
-        case _:
-            raise ValueError(f"Unsupported resize_mode: {resize_mode}")
-        
-        
+def get_filter_mappers() -> list[MapperWrapper | KeyFilter]:
     filters_mappers = [
         KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
         MapperWrapper(
@@ -523,30 +505,27 @@ def get_filter_mappers(
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="before",
-                        transforms=["ToTensor", resize_mode],
+                        transforms=["ToTensor"],
                         transforms_kwargs=[
-                            {},
-                            resize_args,
+                            {}
                         ],
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="after",
-                        transforms=["ToTensor", resize_mode],
+                        transforms=["ToTensor"],
                         transforms_kwargs=[
-                            {},
-                            resize_args,
+                            {}
                         ],
                     )
                 ),
                 TorchvisionMapper(
                     TorchvisionMapperConfig(
                         key="mask",
-                        transforms=["ToTensor", resize_mode, "Normalize"],
+                        transforms=["ToTensor", "Normalize"],
                         transforms_kwargs=[
                             {},
-                            resize_args,
                             {"mean": 0.0, "std": 1.0},
                         ],
                     )
@@ -577,12 +556,10 @@ def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
     batch_size: int,
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
 ):
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    train_filters_mappers = get_filter_mappers()
 
     # unbrace urls
     train_shards_path_or_urls_unbraced = []
@@ -613,7 +590,7 @@ def get_data_module(
     )
 
     # VALIDATION
-    validation_filters_mappers = get_filter_mappers(image_size, resize_mode)
+    validation_filters_mappers = get_filter_mappers()
 
     # unbrace urls
     validation_shards_path_or_urls_unbraced = []
@@ -685,8 +662,6 @@ def main(
     val_check_interval: int = 1000,
     save_top_k: int = 1,
     path_config: str = None,
-    image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
-    resize_mode: str = "Resize" # CenterCrop or Resize
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -707,17 +682,11 @@ def main(
         conditioning_masks_keys=conditioning_masks_keys,
         bridge_noise_sigma=bridge_noise_sigma,
     )
-
-    if isinstance(image_size, list):
-        assert len(image_size) == 2, "image_size must be a tuple of (height, width)"
-        image_size = tuple(image_size)
-
+    
     data_module = get_data_module(
         train_shards=train_shards,
         validation_shards=validation_shards,
         batch_size=batch_size,
-        image_size=image_size,
-        resize_mode=resize_mode,
     )
 
     train_parameters = ["denoiser.*"]
