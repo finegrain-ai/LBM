@@ -29,7 +29,7 @@ def shard_indices(n: int, k: int) -> list[tuple[int, int]]:
     return result
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out_dir", type=Path, default="data/BaiLing")
     parser.add_argument("--repo_id", type=str, default="BaiLing/RemovalBench")
