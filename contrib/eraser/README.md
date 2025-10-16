@@ -22,9 +22,9 @@ uv run --script contrib/eraser/datasets/preprocess_rord.py
 
 Result is saved in `data/RORD-processed/` (auto-created if not existing)
 
-### Prepare the removalbench validation dataset
+### Prepare the RemovalBench validation dataset
 
-To evaluation we use [BaiLing/RemovalBench](https://huggingface.co/datasets/BaiLing/RemovalBench/tree/main) dataset from [OminiEraser](https://arxiv.org/abs/2501.07397).
+As a validation set, we use [BaiLing/RemovalBench](https://huggingface.co/datasets/BaiLing/RemovalBench/tree/main) dataset from [OmniEraser](https://arxiv.org/abs/2501.07397).
 We first format it to webdataset in 8 shards (for 8 GPUs).
 ```
 uv run --script contrib/eraser/datasets/removalbench_webdataset.py
