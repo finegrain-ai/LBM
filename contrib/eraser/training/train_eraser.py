@@ -826,6 +826,8 @@ def main(
                 every_n_train_steps=save_interval,
                 save_last=True,
                 save_top_k=save_top_k,
+                monitor="val/loss",       # metric to rank by
+                mode="min",
             ),
         ],
         num_sanity_val_steps=0,
