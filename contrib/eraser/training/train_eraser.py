@@ -1,13 +1,11 @@
 import datetime
 import logging
 import os
-import random
 import re
 import shutil
 from typing import List, Optional, Tuple, Any, Dict
 from torch import distributed as dist
 
-import braceexpand
 import fire
 import torch
 import yaml
@@ -21,7 +19,6 @@ from pytorch_lightning.strategies import FSDPStrategy
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities import grad_norm
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from torchvision.transforms import InterpolationMode
 from pytorch_lightning.utilities import rank_zero_only
 
 from torchmetrics import MetricCollection
@@ -32,19 +29,6 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModule, DataModuleConfig
-from lbm.data.filters import KeyFilter, KeyFilterConfig
-from lbm.data.mappers import (
-    KeyRenameMapper,
-    KeyRenameMapperConfig,
-    MapperWrapper,
-    RescaleMapper,
-    RescaleMapperConfig,
-    TorchvisionMapper,
-    TorchvisionMapperConfig,
-    RandomPixelMasking,
-    RandomPixelMaskingConfig,
-)
 from lbm.models.embedders import (
     ConditionerWrapper,
     LatentsConcatEmbedder,
@@ -55,9 +39,9 @@ from lbm.models.unets import DiffusersUNet2DCondWrapper
 from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
-from dataclasses import field
 from neptune.types import File
 from torch.optim.optimizer import Optimizer
+from lbm.contrib.data.sana_data_module import InpainterDataModuleConfig, InpainterDataModule
 
 class EraserLogger(Callback):
     """
@@ -309,7 +293,7 @@ def get_model(
     prob: Optional[List[float]] = None,
     conditioning_images_keys: Optional[List[str]] = [],
     conditioning_masks_keys: Optional[List[str]] = [],
-    source_key: str = "before_masked",
+    source_key: str = "before",
     target_key: str = "after",
     bridge_noise_sigma: float = 0.0,
     logit_mean: float = 0.0,
@@ -478,172 +462,15 @@ def get_model(
 
     return model
 
-def get_filter_mappers(
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
-) -> list[MapperWrapper | KeyFilter]:
-
-    match resize_mode:
-        case "CenterCrop":
-            resize_args = {
-                "size": image_size,
-            }
-        case "Resize":
-            resize_args = {
-                "size": image_size,
-                "interpolation": InterpolationMode.NEAREST_EXACT,
-            }
-        case _:
-            raise ValueError(f"Unsupported resize_mode: {resize_mode}")
-        
-        
-    filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["before.jpg", "after.jpg", "mask.png", "__key__"], verbose=True)),
-        MapperWrapper(
-            [
-                KeyRenameMapper(
-                    KeyRenameMapperConfig(
-                        key_map={
-                            "before.jpg": "before",
-                            "after.jpg": "after",
-                            "mask.png": "mask",
-                            "__key__": "uid",
-                        }
-                    )
-                ),
-                TorchvisionMapper(
-                    TorchvisionMapperConfig(
-                        key="before",
-                        transforms=["ToTensor", resize_mode],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                        ],
-                    )
-                ),
-                TorchvisionMapper(
-                    TorchvisionMapperConfig(
-                        key="after",
-                        transforms=["ToTensor", resize_mode],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                        ],
-                    )
-                ),
-                TorchvisionMapper(
-                    TorchvisionMapperConfig(
-                        key="mask",
-                        transforms=["ToTensor", resize_mode, "Normalize"],
-                        transforms_kwargs=[
-                            {},
-                            resize_args,
-                            {"mean": 0.0, "std": 1.0},
-                        ],
-                    )
-                ),
-                # Random pixel masking is made on [0, 1] tensors (before RescaleMapper)
-                RandomPixelMasking(
-                    RandomPixelMaskingConfig(
-                        key="before",
-                        mask_key="mask",
-                        output_key="before_masked",
-                        verbose=True,
-                        seed_key="uid"
-                    )
-                ),
-                RescaleMapper(RescaleMapperConfig(key="mask", verbose=True)), # for visualization only
-                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization only
-                RescaleMapper(RescaleMapperConfig(key="before_masked", verbose=True)),
-                RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
-
-            ],
-        ),
-    ]
-
-    return filters_mappers
-
-
-def get_data_module(
-    train_shards: List[str],
-    validation_shards: List[str],
-    batch_size: int,
-    image_size: Tuple[int, int], # (height, width)
-    resize_mode: str = "Resize" # CenterCrop or Resize
-):
-
-    # TRAIN
-    train_filters_mappers = get_filter_mappers(image_size, resize_mode)
-
-    # unbrace urls
-    train_shards_path_or_urls_unbraced = []
-    for train_shards_path_or_url in train_shards:
-        train_shards_path_or_urls_unbraced.extend(
-            braceexpand.braceexpand(train_shards_path_or_url)
-        )
-
-    # shuffle shards
-    random.shuffle(train_shards_path_or_urls_unbraced)
-
-    # data config
-    train_data_config = DataModuleConfig(
-        shards_path_or_urls=train_shards_path_or_urls_unbraced,
-        decoder="pil",
-        # RORD dataset contains 400K images in 400 shards
-        # 200 out of 400 shards
-        shuffle_before_split_by_node_buffer_size=min(200, len(train_shards_path_or_urls_unbraced)),
-        # Each node has 400/4 ~ 100 shards, so 30 looks fine
-        shuffle_before_split_by_workers_buffer_size=50,
-        # 10 workers means each worker sees ~ 10 shards = 10k samples
-        # Set it to 4k
-        shuffle_before_filter_mappers_buffer_size=4000,
-        # not needed to shuffle after filter mappers
-        shuffle_after_filter_mappers_buffer_size=None,
-        per_worker_batch_size=batch_size,
-        num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
-    )
-
-    # VALIDATION
-    validation_filters_mappers = get_filter_mappers(image_size, resize_mode)
-
-    # unbrace urls
-    validation_shards_path_or_urls_unbraced = []
-    for validation_shards_path_or_url in validation_shards:
-        validation_shards_path_or_urls_unbraced.extend(
-            braceexpand.braceexpand(validation_shards_path_or_url)
-        )
-
-    validation_data_config = DataModuleConfig(
-        shards_path_or_urls=validation_shards_path_or_urls_unbraced,
-        decoder="pil",
-        # deactivate shuffling for validation, so we validate on the same
-        # samples each time
-        shuffle_before_split_by_node_buffer_size=None,
-        shuffle_before_split_by_workers_buffer_size=None,
-        shuffle_before_filter_mappers_buffer_size=None,
-        shuffle_after_filter_mappers_buffer_size=None,
-        per_worker_batch_size=batch_size,
-        num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
-    )
-
-    # data module
-    data_module = DataModule(
-        train_config=train_data_config,
-        train_filters_mappers=train_filters_mappers,
-        eval_config=validation_data_config,
-        eval_filters_mappers=validation_filters_mappers,
-    )
-
-    return data_module
-
-
 def main(
-    train_shards: List[str] = ["pipe:cat path/to/train/shards"],
-    validation_shards: List[str] = ["pipe:cat path/to/validation/shards"],
+    train_data_dir: str | list[str] = "path/to/train/data",
+    validation_data_dir: str | list[str] = "path/to/validation/data",
+    train_meta_path: str | list[str] | None = None, # if None, will try to find wids-meta.json in data_dir
+    validation_meta_path: str | list[str] | None = None, # if None, will try to find wids-meta.json in data_dir
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
-    source_key: str = "before_masked",
+    source_key: str = "before",
     target_key: str = "after",
     neptune_project: str = "LBM-Eraser",
     batch_size: int = 8,
@@ -676,8 +503,8 @@ def main(
     val_check_interval: int = 1000,
     save_top_k: int = 1,
     path_config: str = None,
-    image_size: Tuple[int, int] | List[int] = (480, 640),  # (H, W)
-    resize_mode: str = "Resize" # CenterCrop or Resize
+    resolution: int = 256,
+    num_workers: int = 8,
 ):
     model = get_model(
         backbone_signature=backbone_signature,
@@ -699,16 +526,21 @@ def main(
         bridge_noise_sigma=bridge_noise_sigma,
     )
 
-    if isinstance(image_size, list):
-        assert len(image_size) == 2, "image_size must be a tuple of (height, width)"
-        image_size = tuple(image_size)
-
-    data_module = get_data_module(
-        train_shards=train_shards,
-        validation_shards=validation_shards,
-        batch_size=batch_size,
-        image_size=image_size,
-        resize_mode=resize_mode,
+    data_module = InpainterDataModule(
+        train_config=InpainterDataModuleConfig(
+            data_dir=train_data_dir,
+            meta_path=train_meta_path,
+            batch_size=batch_size,
+            resolution=resolution,
+            num_workers=num_workers
+        ),
+        val_config=InpainterDataModuleConfig(
+            data_dir=validation_data_dir,
+            meta_path=validation_meta_path,
+            batch_size=1, # avoid bucketing side effects
+            resolution=resolution,
+            num_workers=num_workers,
+        ),
     )
 
     train_parameters = ["denoiser.*"]
@@ -718,7 +550,7 @@ def main(
         learning_rate=learning_rate,
         lr_scheduler_name=learning_rate_scheduler,
         lr_scheduler_kwargs=learning_rate_scheduler_kwargs,
-        log_keys=["before", "after", "mask"],
+        log_keys=["before", "after"],
         trainable_params=train_parameters,
         optimizer_name=optimizer,
         optimizer_kwargs=optimizer_kwargs,

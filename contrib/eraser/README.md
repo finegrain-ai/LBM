@@ -5,33 +5,6 @@ Non-official implementation.
 
 ## Dataset
 
-### RORD
-
-#### Download the RORD dataset locally
-
-```
-uv tool install 'huggingface_hub[cli]'
-sudo apt-get install p7zip-full
-./contrib/eraser/datasets/download_rord.sh
-```
-
-#### Format the data to webdataset
-
-ETA on AWS `c6i.8xlarge`: 2h30
-```
-uv run --script contrib/eraser/datasets/preprocess_rord.py
-```
-
-Result is saved in `data/RORD-processed/` (auto-created if not existing)
-
-#### Export a "lite" validation set
-
-To improve the diversity of the validation set, we create a `val-lite` version of it, by choosing only one frame per scene in RORD validation set.
-
-```
-uv run --script contrib/eraser/datasets/extract_val_lite.py
-```
-
 ### Re-LAION-Caption19M
 
 #### Requirements
@@ -90,6 +63,22 @@ Notes :
 * Setting `--max_image_area 16777216 = 4096x4096` is made to avoid errors like `PIL.Image.DecompressionBombError`
 * Currently we only set `--min_image_size 256` as a sanity check, but the dataset is supposed to contains only 1024 images already
 * If the script is hanging, just kill it and re-run it, it's resuming smoothly
+
+#### Webdataset to wids
+
+Split the dataset into train/val
+
+```
+uv run python contrib/eraser/datasets/wids_meta.py \
+  --tars "data/Re-LAION-1300K/{00008..01439}.tar" \
+  --name "re-laion-1300K-train" \
+  --output "data/Re-LAION-1300K/wids-meta-train.json"
+
+uv run python contrib/eraser/datasets/wids_meta.py \
+  --tars "data/Re-LAION-1300K/{00000..00007}.tar" \
+  --name "re-laion-1300K-train" \
+  --output "data/Re-LAION-1300K/wids-meta-validation.json"
+```
 
 ## Train
 
