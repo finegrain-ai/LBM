@@ -403,7 +403,6 @@ def get_model(
         checkpoint_state_dict=state_dict,
         regex_keys=[
             r"class_embedding.linear_\d+.(weight|bias)",
-            r"conv_in.weight",
             r"(down_blocks|up_blocks)\.\d+\.attentions\.\d+\.transformer_blocks\.\d+\.attn\d+\.(to_k|to_v)\.weight",
             r"mid_block\.attentions\.\d+\.transformer_blocks\.\d+\.attn\d+\.(to_k|to_v)\.weight",
         ],
