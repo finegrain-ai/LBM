@@ -6,7 +6,7 @@
 #     "pillow>=11.3.0",
 #     "tqdm>=4.67.1",
 # ]
-
+# ///
 # Inspired from https://github.com/Forty-lock/RORD/blob/3736a6ba0520e0eac78f966f8788f252735d065c/preprocessing.py
 # * Code revamped
 # * Build finemask from polygon annotations of dynamic objects
@@ -67,7 +67,7 @@ def build_fine_mask(
         assert coarse_mask_path is not None
         assert coarse_mask_path.exists(), f"coarse mask not found: {coarse_mask_path}"
         # In practice, RORD provides the inverted coarse mask
-        inverted_coarse_mask = cv2.imread(coarse_mask_path, cv2.IMREAD_GRAYSCALE) // 255
+        inverted_coarse_mask = cv2.imread(str(coarse_mask_path), cv2.IMREAD_GRAYSCALE) // 255
         assert inverted_coarse_mask is not None, f"coarse mask not found: {coarse_mask_path}"
     else:
         inverted_coarse_mask = None
@@ -190,10 +190,15 @@ def process_split(
         else:
             output_stem = original_stem
         sample_records.append(SampleRecord(before_path=before, original_stem=original_stem, output_stem=output_stem))
+    
+    if shuffle:
+        # reorder samples by the randomly-prefixed generated output_stem
+        sample_records.sort(key=lambda r: r.output_stem)
 
     shards = [
         sample_records[i : i + n_sample_per_shard] for i in range(0, len(sample_records), n_sample_per_shard)
     ]
+
     print(f"Sharded into {len(shards)} shards, with up to {n_sample_per_shard} samples each")
     n_leading_zeros = max(6, len(str(len(shards))))
     for shard_idx, shard in enumerate(tqdm(shards)):
