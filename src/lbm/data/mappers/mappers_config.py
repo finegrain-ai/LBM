@@ -107,18 +107,3 @@ class RescaleMapperConfig(BaseMapperConfig):
     """
 
     key: str = "image"
-
-class RandomPixelMaskingConfig(BaseMapperConfig):
-    """
-    Replace pixels (corresponding to a mask) in an image with uniformly sampled random values.
-
-    Args:
-
-        key (str): Key to apply the masking to.
-        mask_key (str): Key containing the mask to apply.
-        seed_key (str | None): Key containing the seed to use for random number generation.
-    """
-
-    key: str = "image"
-    mask_key: str = "mask"
-    seed_key: str | None = None
