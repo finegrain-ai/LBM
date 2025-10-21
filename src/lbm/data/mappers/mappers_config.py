@@ -124,24 +124,24 @@ class RandomPixelMaskingConfig(BaseMapperConfig):
     mask_key: str = "mask"
     seed_key: str | None = None
 
-class ResizeModConfig(BaseMapperConfig):
+@dataclass
+class CustomResizeConfig(BaseMapperConfig):
     """
     Crop the input so that its height and width are multiples of a given number.
 
     Args:
 
         key (str): Key to apply the cropping to.
-        mod (int): The multiple to crop to. Default is 8.
         size_output_key (Optional[str]): Key to store the resulting size (height, width) of the cropped image.
             If None, the size is not stored. Default is None.
         resolution (int): The target resolution to resize the cropped image to 
     """
 
     key: str = "image"
-    mod: int = 8
     size_output_key: str = "image_size"
     resolution: int = 256
 
+@dataclass
 class RandomMaskConfig(BaseMapperConfig):
     """
     Creates a random mask, lama-like

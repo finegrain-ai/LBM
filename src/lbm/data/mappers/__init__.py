@@ -1,11 +1,11 @@
 from .base import BaseMapper
-from .mappers import KeyRenameMapper, RescaleMapper, TorchvisionMapper, RandomPixelMasking, ResizeMod, RandomMask
+from .mappers import KeyRenameMapper, RescaleMapper, TorchvisionMapper, RandomPixelMasking, CustomResize, RandomMask
 from .mappers_config import (
     KeyRenameMapperConfig,
     RescaleMapperConfig,
     TorchvisionMapperConfig,
     RandomPixelMaskingConfig,
-    ResizeModConfig,
+    CustomResizeConfig,
     RandomMaskConfig,
 )
 from .mappers_wrapper import MapperWrapper
@@ -21,8 +21,8 @@ __all__ = [
     "RandomPixelMaskingConfig",
     "MapperWrapper",
     "RandomPixelMasking",
-    "ResizeMod",
-    "ResizeModConfig",
+    "CustomResize",
+    "CustomResizeConfig",
     "RandomMask",
     "RandomMaskConfig"
 ]

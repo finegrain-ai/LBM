@@ -44,8 +44,8 @@ from lbm.data.mappers import (
     TorchvisionMapperConfig,
     RandomPixelMasking,
     RandomPixelMaskingConfig,
-    ResizeMod,
-    ResizeModConfig,
+    CustomResize,
+    CustomResizeConfig,
     RandomMask,
     RandomMaskConfig,
 )
@@ -503,8 +503,8 @@ def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
                         ],
                     )
                 ),
-                ResizeMod(
-                    ResizeModConfig(
+                CustomResize(
+                    CustomResizeConfig(
                         key="after", 
                         resolution=resolution, 
                         size_output_key="image_size"
