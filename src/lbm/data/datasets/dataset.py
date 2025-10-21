@@ -1,4 +1,5 @@
-from typing import Callable, List, Union
+from token import OP
+from typing import Callable, List, Union, Any
 
 import pytorch_lightning as pl
 import webdataset as wds
@@ -8,7 +9,7 @@ from ..filters import BaseFilter, FilterWrapper
 from ..mappers import BaseMapper, MapperWrapper
 from .collation_fn import custom_collation_fn
 from .datasets_config import DataModuleConfig
-
+from .bucketing import custom_bucketing
 
 class DataPipeline:
     """
@@ -132,14 +133,26 @@ class DataPipeline:
                     handler=self.config.handler,
                 ),
             )
-
-        # batching
-        pipeline.append(
-            wds.batched(
-                self.config.per_worker_batch_size,
-                collation_fn=custom_collation_fn,
+        
+        if self.config.bucketing is not None:
+            # aspect ratio bucketing
+            pipeline.append(
+                custom_bucketing(
+                    batchsize=self.config.per_worker_batch_size,
+                    bucket_key=self.config.bucketing.bucket_key,
+                    max_buckets=self.config.bucketing.max_buckets,
+                    partial=self.config.bucketing.partial,
+                    collation_fn=custom_collation_fn
+                )
             )
-        )
+        else:
+            # standard batching
+            pipeline.append(
+                wds.batched(
+                    self.config.per_worker_batch_size,
+                    collation_fn=custom_collation_fn,
+                )
+            )
 
         # apply batched transforms
         pipeline.extend(

@@ -32,7 +32,7 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModule, DataModuleConfig
+from lbm.data.datasets import DataModule, DataModuleConfig, BucketingConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
 from lbm.data.mappers import (
     KeyRenameMapper,
@@ -578,6 +578,11 @@ def get_data_module(
         shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
+        bucketing=BucketingConfig(
+            bucket_key="image_size",
+            max_buckets=300, 
+            partial=False
+        )
     )
 
     # VALIDATION
@@ -599,8 +604,16 @@ def get_data_module(
         shuffle_before_split_by_workers_buffer_size=None,
         shuffle_before_filter_mappers_buffer_size=None,
         shuffle_after_filter_mappers_buffer_size=None,
-        per_worker_batch_size=batch_size,
-        num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
+        # We set validation batch_size to 1 (and num_workers=1), 
+        # so we validate on various image sizes
+        # (it avoids bucketing related side-effects)
+        per_worker_batch_size=1,
+        num_workers=1,
+        bucketing=BucketingConfig(
+            bucket_key="image_size",
+            max_buckets=300, 
+            partial=False
+        )
     )
 
     # data module
