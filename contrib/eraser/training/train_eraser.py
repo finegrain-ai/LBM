@@ -41,7 +41,7 @@ from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
 from neptune.types import File
 from torch.optim.optimizer import Optimizer
-from lbm.contrib.data.sana_data_module import InpainterDataModuleConfig, InpainterDataModule
+from lbm.contrib.data.inpainter_data_module import InpainterDataModuleConfig, InpainterDataModule
 
 class EraserLogger(Callback):
     """
