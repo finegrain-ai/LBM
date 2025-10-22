@@ -3,7 +3,17 @@
 **Goal**: reproduce the object-removal result from the LBM paper (Section 4.1) using SD1.5.
 Non-official implementation.
 
-## RORD Dataset
+## Install
+
+One option is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then:
+
+```bash
+uv venv -p 3.10
+uv pip sync requirements.txt
+uv pip install -e .
+```
+
+## Prepare RORD Dataset
 
 ### Download the RORD dataset locally
 
@@ -30,7 +40,7 @@ To improve the diversity of the validation set, we create a `val-lite` version o
 uv run --script contrib/eraser/datasets/extract_val_lite.py
 ```
 
-## Re-LAION Dataset
+## Prepare Re-LAION Dataset
 
 We extract 1.3M images from [Re-LAION-Caption19M](https://huggingface.co/datasets/supermodelresearch/Re-LAION-Caption19M) for inpainting (see paper 4.1: "in-the-wild images where we randomly masked an area of the image")
 
@@ -43,7 +53,7 @@ curl https://install.duckdb.org | sh
 
 2/ Install [img2dataset](https://github.com/rom1504/img2dataset)
 ```bash
-uv pip install img2dataset
+uv tool install -p 3.10 img2dataset
 ```
 
 3/ Set a knot resolver by following [img2dataset instructions](https://github.com/rom1504/img2dataset?tab=readme-ov-file#setting-up-a-knot-resolver)
@@ -106,6 +116,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 Then
 ```bash
-python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
+uv run python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
 ```
 
