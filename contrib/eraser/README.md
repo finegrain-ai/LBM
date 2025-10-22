@@ -88,7 +88,7 @@ Notes :
 * We purposely do not resize the images here so the dataset is compatible with multiple size
 * Setting `--resize_mode no` is mandatory, by default it's `--resize_mode border` with `--image_size 256`
 * Setting `--max_image_area 16777216 = 4096x4096` is made to avoid errors like `PIL.Image.DecompressionBombError`
-* Currently we only set `--min_image_size 256` as a sanity check, but the dataset is supposed to contains only 1024 images already
+* Currently we only set `--min_image_size 256` as a sanity check, but the dataset is supposed to contain only 1024 images already
 * If the script is hanging, just kill it and re-run it, it's resuming smoothly
 
 ## Train
