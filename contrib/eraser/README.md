@@ -51,7 +51,7 @@ uv pip install img2dataset
 ### Download
 
 First download the files
-```
+```bash
 git lfs install
 git clone git@hf.co:datasets/supermodelresearch/Re-LAION-Caption19M data/supermodelresearch/Re-LAION-Caption19M
 ```
