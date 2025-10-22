@@ -61,7 +61,7 @@ duckdb < contrib/eraser/datasets/re_laion_caption19m_filter.sql
 ```
 An extract of `Re-LAION-Caption19M` is then saved in `Re-LAION-1300K-parquet`
 
-It takes ~4h (on a `c6i.32xlarge`) and it requires ~1.1TB of free space disk
+It takes ~4h (on a `c6i.32xlarge`) and it requires ~1.1TB of free space disk to convert into WebDataset format
 ```bash
 export DATA_FOLDER='data/Re-LAION-1300K-parquet/'
 export OUTPUT_FOLDER=data/Re-LAION-1300K
