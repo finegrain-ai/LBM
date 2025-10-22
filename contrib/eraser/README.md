@@ -79,7 +79,7 @@ export SAVE_ADDITIONAL_COLUMNS='["aesthetic_score","llava_next_caption","luminan
 export PROCESSES_COUNT=128
 export THREAD_COUNT=256
 
-NO_ALBUMENTATIONS_UPDATE=1 uv run img2dataset \
+NO_ALBUMENTATIONS_UPDATE=1 img2dataset \
   --url_list $DATA_FOLDER \
   --output_folder $OUTPUT_FOLDER \
   --input_format parquet \
