@@ -122,7 +122,17 @@ class EraserLogger(Callback):
         batch: Any,
         batch_idx: int,
     ) -> None:
+
+        assert pl_module.model.timestep_sampling == "custom_timesteps", f"Unexpected timestep_sampling: {pl_module.model.timestep_sampling}"
+        
+        for timestep in pl_module.model.config.selected_timesteps:
+            self.log(f"val/loss_t{timestep}", outputs[f"loss_t{timestep}"], on_epoch=True, sync_dist=True)
+            self.log(f"val/latent_recon_loss_t{timestep}", outputs[f"latent_recon_loss_t{timestep}"], on_epoch=True, sync_dist=True)
+            self.log(f"val/pixel_recon_loss_t{timestep}", outputs[f"pixel_recon_loss_t{timestep}"], on_epoch=True, sync_dist=True)
+        
         self.log("val/loss", outputs["loss"], on_epoch=True, sync_dist=True)
+        self.log("val/latent_recon_loss", outputs["latent_recon_loss"], on_epoch=True, sync_dist=True)
+        self.log("val/pixel_recon_loss", outputs["pixel_recon_loss"], on_epoch=True, sync_dist=True)
 
         # Infer the samples
         samples = pl_module.log_samples(batch)

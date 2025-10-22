@@ -93,8 +93,10 @@ class LBMModel(BaseModel):
         if self.conditioner is not None:
             self.conditioner.on_fit_start(device=device, *args, **kwargs)
 
-    def forward(self, batch: Dict[str, Any], step=0, batch_idx=0, seed=None, *args, **kwargs):
-
+    def forward_timestep(self, batch: Dict[str, Any], timestep: torch.Tensor, step=0, batch_idx=0, seed=None, *args, **kwargs):
+        """
+        Forward method for a given timestep
+        """
         self.num_iterations += 1
 
         # Get inputs/latents
@@ -137,7 +139,6 @@ class LBMModel(BaseModel):
         conditioning = self._get_conditioning(batch, *args, **kwargs)
 
         # Sample a timestep
-        timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device, seed=seed)
         sigmas = None
 
         # Create interpolant
@@ -205,6 +206,24 @@ class LBMModel(BaseModel):
             "predicted_hr": denoised_sample,
             "noisy_sample": noisy_sample,
         }
+
+    def forward(self, batch: Dict[str, Any], step=0, batch_idx=0, seed=None, *args, **kwargs):
+
+        self.num_iterations += 1
+        z = batch[self.target_key]
+
+        # Sample a timestep
+        timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device, seed=seed)
+
+        return self.forward_timestep(
+            batch,
+            timestep,
+            step=step,
+            batch_idx=batch_idx,
+            seed=seed,
+            *args,
+            **kwargs,
+        )
 
     def latent_loss(self, prediction, model_input, valid_latent_mask):
         if self.latent_loss_type == "l2":

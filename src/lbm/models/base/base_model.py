@@ -29,6 +29,9 @@ class BaseModel(nn.Module):
     def forward(self, batch: Dict[str, Any], *args, **kwargs):
         raise NotImplementedError("forward method is not implemented")
 
+    def forward_timestep(self, batch: Dict[str, Any], timestep: torch.Tensor, *args, **kwargs):
+        raise NotImplementedError("forward_timestep method is not implemented")
+
     def freeze(self):
         """Freeze the model"""
         self.eval()
