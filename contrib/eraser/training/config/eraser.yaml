@@ -12,7 +12,7 @@ latent_loss_weight: 1.0
 bridge_noise_sigma: 0.05 # see Appendix A.1
 conditioning_images_keys: []
 conditioning_masks_keys: []
-resolution: 256
+resolution: 512
 
 train_shards: 
 - "data/Re-LAION-1300K/{00008..01432}.tar"
@@ -28,7 +28,7 @@ max_epochs: 50
 gradient_clip_val: null
 
 # Validation
-limit_val_batches: 2 # 2 x 8 (batch_size) x 4 GPUs = 64 samples for validation
+limit_val_batches: 16 # 16 x 1 (batch_size) x 4 GPUs = 64 samples for validation
 val_check_interval: 500 # 500 means every 8 (batch) * 4 (gpus) * 500 = 16000 training samples
 
 # Checkpointing
@@ -38,4 +38,3 @@ save_interval: 500 # synced with val_check_interval
 # 25 * 500 = 12500 last steps are covered
 save_top_k: 25
 save_ckpt_path: ./checkpoints
-
