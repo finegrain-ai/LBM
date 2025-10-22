@@ -170,7 +170,8 @@ class TrainingPipeline(pl.LightningModule):
         }
 
     def validation_step(self, val_batch: Dict[str, Any], val_idx: int) -> dict:
-        if self.model.config.seed_key is not None and self.model.config.seed_key in val_batch:
+        if self.model.config.seed_key is not None:
+            assert self.model.config.seed_key in val_batch
             seed = seed_from_string("-".join(val_batch[self.model.config.seed_key]))
         else:
             seed = None
