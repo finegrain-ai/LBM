@@ -20,6 +20,9 @@ class LBMConfig(ModelConfig):
         mask_key (Optional[str]):
             Key for the mask showing the valid pixels. Defaults to None
 
+        seed_key (Optional[str]):
+            Key to seed randomness in validation step. Defaults to None
+
         latent_loss_type (str):
             Loss type to use. Defaults to "l2". Choices are "l2", "l1"
 
@@ -70,6 +73,7 @@ class LBMConfig(ModelConfig):
     source_key: str = "source_image"
     target_key: str = "target_image"
     mask_key: Optional[str] = None
+    seed_key: Optional[str] = None
     latent_loss_weight: float = 1.0
     latent_loss_type: Literal["l2", "l1"] = "l2"
     pixel_loss_type: Literal["l2", "l1", "lpips"] = "l2"

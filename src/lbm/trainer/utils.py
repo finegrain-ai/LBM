@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+import hashlib
 from typing import Dict, List, Literal, Optional, Tuple
 
 import torch
@@ -191,3 +192,6 @@ class StateDictRenamer:
                 checkpoint_state_dict[new_key] = checkpoint_state_dict.pop(old_key)
                 logging.info(f"Renaming {old_key} to {new_key}")
         return checkpoint_state_dict
+
+def seed_from_string(s: str) -> int:
+    return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)

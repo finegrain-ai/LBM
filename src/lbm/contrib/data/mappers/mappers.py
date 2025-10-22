@@ -2,8 +2,8 @@ from typing import Any, Dict
 import torchvision.transforms.functional as F
 import torch
 from torch import Tensor
-import hashlib
 from lbm.data.mappers.base import BaseMapper
+from lbm.trainer.utils import seed_from_string
 from ..masking import create_random_mask
 from ..aspect_ratios import get_target_size
 
@@ -33,13 +33,10 @@ class RandomPixelMasking(BaseMapper):
         )
         return batch
     
-    def _seed_from_string(self, s: str) -> int:
-        return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)
-    
     def _process(self, mask: Tensor, image: Tensor, seed: str | None) -> Tensor:
         if seed:
             generator = torch.Generator(device=image.device)
-            generator.manual_seed(self._seed_from_string(seed))
+            generator.manual_seed(seed_from_string(seed))
         else:
             generator = None
         
@@ -113,14 +110,11 @@ class RandomMask(BaseMapper):
             seed=batch[self.config.seed_key] if self.config.seed_key else None,
         )
         return batch
-
-    def _seed_from_string(self, s: str) -> int:
-        return int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16) % (2**32)
     
     def _process(self, image: Tensor, seed: int | str | None) -> Tensor:
         _, h, w = image.shape
         if isinstance(seed, str):
-            seed = self._seed_from_string(seed)
+            seed = seed_from_string(seed)
         mask = create_random_mask((w, h), seed=seed)  # (width, height)
         mask = mask.unsqueeze(0)  # 1, h, w
         if self.channels != 1:
