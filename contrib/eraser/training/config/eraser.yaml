@@ -15,7 +15,7 @@ conditioning_masks_keys: []
 resolution: 512
 
 train_shards: 
-- "data/Re-LAION-1300K/{00008..00040}.tar"
+- "data/Re-LAION-1300K/{00008..01432}.tar"
 validation_shards: 
 - "data/Re-LAION-1300K/{00000..00007}.tar"
 
