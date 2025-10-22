@@ -2,7 +2,7 @@ import math
 import random
 
 import numpy as np
-from .lama.mask import MixedMaskGenerator
+from .lama import MixedMaskGenerator
 import torch
 
 def build_mask_generator(image_size: tuple[int, int]) -> MixedMaskGenerator:

@@ -5,23 +5,6 @@ from pydantic.dataclasses import dataclass
 
 from ...config import BaseConfig
 
-@dataclass
-class BucketingConfig(BaseConfig):
-    """
-    Configuration for aspect ratio bucketing
-
-    Args:
-        bucket_key (str):
-            Key in the sample that contains the image, to use to get sample size. Defaults to "image".
-        max_buckets (int):
-            Maximum number of different buckets to allow. Defaults to 300.
-        partial (bool):
-            Whether to drop the last batch if it's smaller than the specified batch size. Defaults to False
-    """
-
-    bucket_key: str = "image"
-    max_buckets: int = 300
-    partial: bool = False
 
 @dataclass
 class DataModuleConfig(BaseConfig):
@@ -52,7 +35,6 @@ class DataModuleConfig(BaseConfig):
     decoder: str = "pil"
     handler: Callable = wds.warn_and_continue
     rename_files_fn: Optional[Callable[[str], str]] = None
-    bucketing: Optional[BucketingConfig] = None
 
     def __post_init__(self):
         super().__post_init__()

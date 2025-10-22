@@ -1,5 +1,4 @@
-from token import OP
-from typing import Callable, List, Union, Any
+from typing import Callable, List, Union
 
 import pytorch_lightning as pl
 import webdataset as wds
@@ -9,7 +8,7 @@ from ..filters import BaseFilter, FilterWrapper
 from ..mappers import BaseMapper, MapperWrapper
 from .collation_fn import custom_collation_fn
 from .datasets_config import DataModuleConfig
-from .bucketing import custom_bucketing
+
 
 class DataPipeline:
     """
@@ -36,11 +35,13 @@ class DataPipeline:
         batched_filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
         ] = None,
+        batched_fn: Callable = wds.batched
     ):
         self.config = config
         self.shards_path_or_urls = config.shards_path_or_urls
         self.filters_mappers = filters_mappers
         self.batched_filters_mappers = batched_filters_mappers or []
+        self.batched_fn = batched_fn
 
         if filters_mappers is None:
             filters_mappers = []
@@ -133,26 +134,14 @@ class DataPipeline:
                     handler=self.config.handler,
                 ),
             )
-        
-        if self.config.bucketing is not None:
-            # aspect ratio bucketing
-            pipeline.append(
-                custom_bucketing(
-                    batchsize=self.config.per_worker_batch_size,
-                    bucket_key=self.config.bucketing.bucket_key,
-                    max_buckets=self.config.bucketing.max_buckets,
-                    partial=self.config.bucketing.partial,
-                    collation_fn=custom_collation_fn
-                )
+
+        # batching
+        pipeline.append(
+            self.batched_fn(
+                self.config.per_worker_batch_size,
+                collation_fn=custom_collation_fn,
             )
-        else:
-            # standard batching
-            pipeline.append(
-                wds.batched(
-                    self.config.per_worker_batch_size,
-                    collation_fn=custom_collation_fn,
-                )
-            )
+        )
 
         # apply batched transforms
         pipeline.extend(
@@ -200,6 +189,9 @@ class DataModule(pl.LightningDataModule):
 
         eval_batched_filters_mappers (List[Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]]):
             List of batched transforms for the evaluation dataset. These will be sequentially applied.
+        
+        batched_fn (Callable):
+            Function to use for batching the dataset. Defaults to wds.batched.
     """
 
     def __init__(
@@ -216,6 +208,7 @@ class DataModule(pl.LightningDataModule):
         eval_batched_filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
         ] = None,
+        batched_fn: Callable = wds.batched,
     ):
         super().__init__()
 
@@ -226,6 +219,7 @@ class DataModule(pl.LightningDataModule):
         self.eval_config = eval_config
         self.eval_filters_mappers = eval_filters_mappers
         self.eval_batched_filters_mappers = eval_batched_filters_mappers
+        self.batched_fn = batched_fn
 
     def setup(self, stage=None):
         """
@@ -237,6 +231,7 @@ class DataModule(pl.LightningDataModule):
             config=self.train_config,
             filters_mappers=self.train_filters_mappers,
             batched_filters_mappers=self.train_batched_filters_mappers,
+            batched_fn=self.batched_fn
         )
         self.train_pipeline.setup()
 
@@ -246,6 +241,7 @@ class DataModule(pl.LightningDataModule):
                 config=self.eval_config,
                 filters_mappers=self.eval_filters_mappers,
                 batched_filters_mappers=self.eval_batched_filters_mappers,
+                batched_fn=self.batched_fn
             )
             self.eval_pipeline.setup()
 

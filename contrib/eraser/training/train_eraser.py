@@ -21,7 +21,6 @@ from pytorch_lightning.strategies import FSDPStrategy
 from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities import grad_norm
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from torchvision.transforms import InterpolationMode
 from pytorch_lightning.utilities import rank_zero_only
 
 from torchmetrics import MetricCollection
@@ -32,7 +31,7 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModule, DataModuleConfig, BucketingConfig
+from lbm.data.datasets import DataModule, DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
 from lbm.data.mappers import (
     KeyRenameMapper,
@@ -42,6 +41,8 @@ from lbm.data.mappers import (
     RescaleMapperConfig,
     TorchvisionMapper,
     TorchvisionMapperConfig,
+)
+from lbm.contrib.data.mappers import (
     RandomPixelMasking,
     RandomPixelMaskingConfig,
     CustomResize,
@@ -49,6 +50,7 @@ from lbm.data.mappers import (
     RandomMask,
     RandomMaskConfig,
 )
+from lbm.contrib.data.bucketing import bucketing_batch
 from lbm.models.embedders import (
     ConditionerWrapper,
     LatentsConcatEmbedder,
@@ -59,7 +61,6 @@ from lbm.models.unets import DiffusersUNet2DCondWrapper
 from lbm.models.vae import AutoencoderKLDiffusers, AutoencoderKLDiffusersConfig
 from lbm.trainer import TrainingConfig, TrainingPipeline
 from lbm.trainer.utils import StateDictAdapter
-from dataclasses import field
 from neptune.types import File
 from torch.optim.optimizer import Optimizer
 
@@ -577,12 +578,7 @@ def get_data_module(
         # not needed to shuffle after filter mappers
         shuffle_after_filter_mappers_buffer_size=None,
         per_worker_batch_size=batch_size,
-        num_workers=min(10, len(train_shards_path_or_urls_unbraced)),
-        bucketing=BucketingConfig(
-            bucket_key="image_size",
-            max_buckets=300, 
-            partial=False
-        )
+        num_workers=min(10, len(train_shards_path_or_urls_unbraced))
     )
 
     # VALIDATION
@@ -609,11 +605,11 @@ def get_data_module(
         # (it avoids bucketing related side-effects)
         per_worker_batch_size=1,
         num_workers=1,
-        bucketing=BucketingConfig(
-            bucket_key="image_size",
-            max_buckets=300, 
-            partial=False
-        )
+    )
+
+    batched_fn = bucketing_batch(
+        bucket_key="image_size",
+        partial=True,
     )
 
     # data module
@@ -622,6 +618,7 @@ def get_data_module(
         train_filters_mappers=train_filters_mappers,
         eval_config=validation_data_config,
         eval_filters_mappers=validation_filters_mappers,
+        batched_fn=batched_fn
     )
 
     return data_module

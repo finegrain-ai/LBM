@@ -4,6 +4,6 @@ they can be used to create the dataloaders and setup the data pipelines.
 """
 
 from .dataset import DataModule
-from .datasets_config import DataModuleConfig, BucketingConfig
+from .datasets_config import DataModuleConfig
 
-__all__ = ["DataModule", "DataModuleConfig", "BucketingConfig"]
+__all__ = ["DataModule", "DataModuleConfig"]
