@@ -119,7 +119,7 @@ class RandomMask(BaseMapper):
         if isinstance(seed, str):
             seed = self._seed_from_string(seed)
         mask = create_random_mask((w, h), seed=seed)  # (width, height)
-        mask = mask.unsqueeze(0) # 1, h, w
+        mask = mask.unsqueeze(0)  # 1, h, w
         if self.channels != 1:
             mask = mask.repeat(self.channels, 1, 1)  # n_channels, h, w
         return mask
