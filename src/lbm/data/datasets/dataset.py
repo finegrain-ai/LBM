@@ -24,6 +24,9 @@ class DataPipeline:
 
         batched_filters_mappers (List[Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]]):
             List of batched transforms for the dataset. These will be sequentially applied.
+        
+        batched_fn (Callable):
+            Function to use for batching the dataset. Defaults to wds.batched.
     """
 
     def __init__(
@@ -35,11 +38,13 @@ class DataPipeline:
         batched_filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
         ] = None,
+        batched_fn: Callable = wds.batched
     ):
         self.config = config
         self.shards_path_or_urls = config.shards_path_or_urls
         self.filters_mappers = filters_mappers
         self.batched_filters_mappers = batched_filters_mappers or []
+        self.batched_fn = batched_fn
 
         if filters_mappers is None:
             filters_mappers = []
@@ -135,7 +140,7 @@ class DataPipeline:
 
         # batching
         pipeline.append(
-            wds.batched(
+            self.batched_fn(
                 self.config.per_worker_batch_size,
                 collation_fn=custom_collation_fn,
             )
@@ -187,6 +192,9 @@ class DataModule(pl.LightningDataModule):
 
         eval_batched_filters_mappers (List[Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]]):
             List of batched transforms for the evaluation dataset. These will be sequentially applied.
+        
+        batched_fn (Callable):
+            Function to use for batching the dataset. Defaults to wds.batched.
     """
 
     def __init__(
@@ -203,6 +211,7 @@ class DataModule(pl.LightningDataModule):
         eval_batched_filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
         ] = None,
+        batched_fn: Callable = wds.batched,
     ):
         super().__init__()
 
@@ -213,6 +222,7 @@ class DataModule(pl.LightningDataModule):
         self.eval_config = eval_config
         self.eval_filters_mappers = eval_filters_mappers
         self.eval_batched_filters_mappers = eval_batched_filters_mappers
+        self.batched_fn = batched_fn
 
     def setup(self, stage=None):
         """
@@ -224,6 +234,7 @@ class DataModule(pl.LightningDataModule):
             config=self.train_config,
             filters_mappers=self.train_filters_mappers,
             batched_filters_mappers=self.train_batched_filters_mappers,
+            batched_fn=self.batched_fn
         )
         self.train_pipeline.setup()
 
@@ -233,6 +244,7 @@ class DataModule(pl.LightningDataModule):
                 config=self.eval_config,
                 filters_mappers=self.eval_filters_mappers,
                 batched_filters_mappers=self.eval_batched_filters_mappers,
+                batched_fn=self.batched_fn
             )
             self.eval_pipeline.setup()
 
