@@ -25,7 +25,7 @@ def bucketing_batch(
     Args:
 
         bucket_key (str):
-            Key in the sample that contains the image, to use to get sample size. Defaults to "image".
+            Key in the sample used to retrieve the image size as a (height, width) tuple for aspect ratio bucketing.
         
         partial (bool):
             Whether to send the last batch if it's smaller than the specified batch size. Defaults to False
