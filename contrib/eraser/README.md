@@ -41,7 +41,7 @@ We extract 1.3M images from [Re-LAION-Caption19M](https://huggingface.co/dataset
 curl https://install.duckdb.org | sh
 ```
 
-2/ Install img2dataset
+2/ Install [img2dataset](https://github.com/rom1504/img2dataset)
 ```
 uv pip install img2dataset
 ```
