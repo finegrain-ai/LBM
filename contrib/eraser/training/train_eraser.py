@@ -828,7 +828,7 @@ def main(
                 mode="min",
             ),
         ],
-        num_sanity_val_steps=0,
+        num_sanity_val_steps=limit_val_batches,  # sanity check to detect issues early
         precision="bf16-mixed",
         limit_val_batches=limit_val_batches,
         val_check_interval=val_check_interval,
