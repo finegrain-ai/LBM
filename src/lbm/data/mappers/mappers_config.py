@@ -108,6 +108,7 @@ class RescaleMapperConfig(BaseMapperConfig):
 
     key: str = "image"
 
+@dataclass
 class RandomPixelMaskingConfig(BaseMapperConfig):
     """
     Replace pixels (corresponding to a mask) in an image with uniformly sampled random values.
