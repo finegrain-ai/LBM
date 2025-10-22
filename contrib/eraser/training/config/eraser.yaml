@@ -28,7 +28,8 @@ max_epochs: 50
 gradient_clip_val: null
 
 # Validation
-limit_val_batches: 16 # 16 x 1 (val batch_size) x 4 GPUs = 64 samples for validation
+# val_batch_size is fixed to 1, to have different image sizes
+limit_val_batches: 16 # 16 x 1 (val_batch_size) x 4 GPUs = 64 samples for validation
 val_check_interval: 500 # 500 means every 8 (batch) * 4 (gpus) * 500 = 16000 training samples
 
 # Checkpointing

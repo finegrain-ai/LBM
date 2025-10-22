@@ -24,6 +24,9 @@ class DataPipeline:
 
         batched_filters_mappers (List[Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]]):
             List of batched transforms for the dataset. These will be sequentially applied.
+        
+        batched_fn (Callable):
+            Function to use for batching the dataset. Defaults to wds.batched.
     """
 
     def __init__(
