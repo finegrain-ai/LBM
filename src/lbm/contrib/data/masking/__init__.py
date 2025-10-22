@@ -13,7 +13,7 @@ def build_mask_generator(image_size: tuple[int, int]) -> MixedMaskGenerator:
     av_resolution = math.sqrt(image_size[0] * image_size[1])
     # Params from https://github.com/advimman/lama/blob/786f5936b27fb3dacd2b1ad799e4de968ea697e7/configs/training/data/abl-04-256-mh-dist.yaml
     # Used in lama-regular in https://github.com/advimman/lama/blob/786f5936b27fb3dacd2b1ad799e4de968ea697e7/configs/training/lama-regular.yaml
-    # Compared to official LaMa code, we have added 20% outpainting (see FG-5307)
+    # Compared to official LaMa code, we have added 20% outpainting
     mask_gen_kwargs = {
         "irregular_proba": 0.4,
         "irregular_kwargs": {
