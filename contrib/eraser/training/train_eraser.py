@@ -449,6 +449,7 @@ def get_model(
         source_key=source_key,
         target_key=target_key,
         mask_key=None, # for the eraser all the pixels in the target image are valid
+        seed_key="uid", # only used for validation_step
         latent_loss_weight=latent_loss_weight,
         latent_loss_type=latent_loss_type,
         pixel_loss_type=pixel_loss_type,

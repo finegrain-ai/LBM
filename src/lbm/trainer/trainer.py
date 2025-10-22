@@ -9,6 +9,7 @@ import torch
 
 from ..models.base.base_model import BaseModel
 from .training_config import TrainingConfig
+from .utils import seed_from_string
 
 logging.basicConfig(level=logging.INFO)
 
@@ -169,7 +170,12 @@ class TrainingPipeline(pl.LightningModule):
         }
 
     def validation_step(self, val_batch: Dict[str, Any], val_idx: int) -> dict:
-        loss = self.model(val_batch, device=self.device)["loss"]
+        if self.model.config.seed_key is not None:
+            assert self.model.config.seed_key in val_batch
+            seed = seed_from_string("-".join(val_batch[self.model.config.seed_key]))
+        else:
+            seed = None
+        loss = self.model(val_batch, device=self.device, seed=seed)["loss"]
 
         metrics = self.model.compute_metrics(val_batch)
 

@@ -93,7 +93,7 @@ class LBMModel(BaseModel):
         if self.conditioner is not None:
             self.conditioner.on_fit_start(device=device, *args, **kwargs)
 
-    def forward(self, batch: Dict[str, Any], step=0, batch_idx=0, *args, **kwargs):
+    def forward(self, batch: Dict[str, Any], step=0, batch_idx=0, seed=None, *args, **kwargs):
 
         self.num_iterations += 1
 
@@ -137,19 +137,25 @@ class LBMModel(BaseModel):
         conditioning = self._get_conditioning(batch, *args, **kwargs)
 
         # Sample a timestep
-        timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device)
+        timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device, seed=seed)
         sigmas = None
 
         # Create interpolant
         sigmas = self._get_sigmas(
             self.training_noise_scheduler, timestep, n_dim=4, device=z.device
         )
+
+        if seed is not None:
+            generator = torch.Generator(device=z.device).manual_seed(seed)
+        else:
+            generator = None
+        
         noisy_sample = (
             sigmas * z_source
             + (1.0 - sigmas) * z
             + self.bridge_noise_sigma
             * (sigmas * (1.0 - sigmas)) ** 0.5
-            * torch.randn_like(z)
+            * torch.randn(z.shape, dtype=z.dtype, device=z.device, generator=generator)
         )
 
         for i, t in enumerate(timestep):
@@ -326,7 +332,7 @@ class LBMModel(BaseModel):
         else:
             return None
 
-    def _timestep_sampling(self, n_samples=1, device="cpu"):
+    def _timestep_sampling(self, n_samples=1, device="cpu", seed=None):
         if self.timestep_sampling == "uniform":
             idx = torch.randint(
                 0,
@@ -350,7 +356,12 @@ class LBMModel(BaseModel):
             return self.training_noise_scheduler.timesteps[indices].to(device=device)
 
         elif self.timestep_sampling == "custom_timesteps":
-            idx = np.random.choice(len(self.selected_timesteps), n_samples, p=self.prob)
+            if seed is None:
+                idx = np.random.choice(len(self.selected_timesteps), n_samples, p=self.prob)
+            else:
+                rng = np.random.default_rng(seed)
+                idx = rng.choice(len(self.selected_timesteps), n_samples, p=self.prob)
+            
 
             return torch.tensor(
                 self.selected_timesteps, device=device, dtype=torch.long
