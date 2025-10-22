@@ -85,7 +85,7 @@ NO_ALBUMENTATIONS_UPDATE=1 uv run img2dataset \
 ```
 
 Notes : 
-* We purposely do not resize the images here so the dataset is compatible with multiple size
+* We purposely do not resize the images here so the dataset is compatible with multiple sizes
 * Setting `--resize_mode no` is mandatory, by default it's `--resize_mode border` with `--image_size 256`
 * Setting `--max_image_area 16777216 = 4096x4096` is made to avoid errors like `PIL.Image.DecompressionBombError`
 * Currently we only set `--min_image_size 256` as a sanity check, but the dataset is supposed to contain only 1024 images already
