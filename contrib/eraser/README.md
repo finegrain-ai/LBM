@@ -59,7 +59,7 @@ Then extract the images with `aestetic > 0.5` and `pwatermark < 0.2` (takes ~50s
 ```
 duckdb < contrib/eraser/datasets/re_laion_caption19m_filter.sql
 ```
-An extract of `Re-LAION-Caption19M` is then saved in `Re-LAION-1300K-parquet`
+An extract of `Re-LAION-Caption19M` is then saved in `data/Re-LAION-1300K-parquet`
 
 It takes ~4h (on a `c6i.32xlarge`) and it requires ~1.1TB of free space disk to convert into WebDataset format
 ```bash
