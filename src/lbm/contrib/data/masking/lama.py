@@ -4,7 +4,6 @@
 #    B/ it requires detectron2 mask_evaluation.py and other dependencies to work
 # - Added the LinearRamp class (to avoid copying utils.py)
 #
-# See FG-5307 for more details.
 import math
 import random
 import hashlib
