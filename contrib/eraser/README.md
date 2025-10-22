@@ -32,7 +32,7 @@ uv run --script contrib/eraser/datasets/extract_val_lite.py
 
 ## Re-LAION Dataset
 
-We extract 1.3M images from [Re-LAION-Caption19M](https://huggingface.co/datasets/supermodelresearch/Re-LAION-Caption19M)
+We extract 1.3M images from [Re-LAION-Caption19M](https://huggingface.co/datasets/supermodelresearch/Re-LAION-Caption19M) for inpainting (see paper 4.1: "in-the-wild images where we randomly masked an area of the image")
 
 ### Requirements
 
