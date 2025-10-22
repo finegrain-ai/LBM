@@ -54,7 +54,7 @@ def create_random_mask(
         np.random.seed(seed % (2**32 - 1))
 
     # mask_generator segmentation has been deactivated
-    # because it's not used in official LaMa training (see FG-5307)
+    # because it's not used in official LaMa training
     # So we can use a fake image as input, only the size matters
     fake_image = np.zeros((3, image_size[1], image_size[0]), dtype=np.float32)
     mask = mask_generator(fake_image).squeeze(0)  # 1, h, w -> h, w
