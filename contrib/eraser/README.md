@@ -37,7 +37,7 @@ We extract 1.3M images from [Re-LAION-Caption19M](https://huggingface.co/dataset
 ### Requirements
 
 1/ Install [duckdb](https://duckdb.org/) CLI
-```
+```bash
 curl https://install.duckdb.org | sh
 ```
 
