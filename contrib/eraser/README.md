@@ -5,7 +5,7 @@ Non-official implementation.
 
 ## Install
 
-One option is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then:
+One option is to install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then, from the root folder:
 
 ```bash
 uv venv -p 3.10
