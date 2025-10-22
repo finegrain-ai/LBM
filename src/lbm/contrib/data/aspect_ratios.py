@@ -1,4 +1,4 @@
-# Inspired from https://github.com/NVlabs/Sana/blob/34b4aa5c102bfa36cb57ad68a43a15ec7fe3f411/diffusion/data/datasets/utils.py#L1
+# Inspired from https://github.com/NVlabs/Sana/blob/34b4aa5c102bfa36cb57ad68a43a15ec7fe3f411/diffusion/data/datasets/utils.py
 
 ASPECT_RATIO_512 = {
     "0.25": (256, 1024),
