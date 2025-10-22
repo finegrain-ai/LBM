@@ -42,7 +42,7 @@ curl https://install.duckdb.org | sh
 ```
 
 2/ Install [img2dataset](https://github.com/rom1504/img2dataset)
-```
+```bash
 uv pip install img2dataset
 ```
 
