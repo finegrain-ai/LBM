@@ -1,15 +1,15 @@
-from .mappers import RandomPixelMasking, CustomResize, RandomMask
+from .mappers import RandomPixelMasking, AspectRatioResize, RandomMask
 from .mappers_config import (
     RandomPixelMaskingConfig,
-    CustomResizeConfig,
+    AspectRatioResizeConfig,
     RandomMaskConfig,
 )
 
 __all__ = [
     "RandomPixelMasking",
     "RandomPixelMaskingConfig",
-    "CustomResize",
-    "CustomResizeConfig",
+    "AspectRatioResize",
+    "AspectRatioResizeConfig",
     "RandomMask",
     "RandomMaskConfig"
 ]

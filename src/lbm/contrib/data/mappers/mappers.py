@@ -8,7 +8,7 @@ from ..masking import create_random_mask
 from ..aspect_ratios import get_target_size
 
 from .mappers_config import (
-    CustomResizeConfig,
+    AspectRatioResizeConfig,
     RandomPixelMaskingConfig,
     RandomMaskConfig,
 )
@@ -46,16 +46,19 @@ class RandomPixelMasking(BaseMapper):
         noise = torch.empty_like(image).uniform_(generator=generator)
         return image * (1 - mask) + noise * mask
 
-class CustomResize(BaseMapper):
+class AspectRatioResize(BaseMapper):
     """
-    Crop the input so that its height and width are multiples of a given number.
+    Resize an image to a predefined list of size (hardcoded in aspect_ratios.py), depending on args.resolution 
+    and the aspect ratio of the image.
+
+    If config.size_output_key is not None, it outputs the size of the cropped image (useful for size-related bucketing).
 
     Args:
 
-        config (CustomResizeConfig): Configuration for the mapper
+        config (AspectRatioResizeConfig): Configuration for the mapper
     """
 
-    def __init__(self, config: CustomResizeConfig):
+    def __init__(self, config: AspectRatioResizeConfig):
         super().__init__(config)
         self.resolution = config.resolution
         self.size_output_key = config.size_output_key

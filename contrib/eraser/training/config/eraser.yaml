@@ -15,11 +15,11 @@ conditioning_masks_keys: []
 resolution: 512
 
 train_shards: 
-- "data/Re-LAION-1300K/{00008..01432}.tar"
+- "data/Re-LAION-1300K/{00008..00040}.tar"
 validation_shards: 
 - "data/Re-LAION-1300K/{00000..00007}.tar"
 
-batch_size: 8
+train_batch_size: 8
 learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW
 num_steps: [1, 4]
@@ -28,7 +28,7 @@ max_epochs: 50
 gradient_clip_val: null
 
 # Validation
-limit_val_batches: 16 # 16 x 1 (batch_size) x 4 GPUs = 64 samples for validation
+limit_val_batches: 16 # 16 x 1 (val batch_size) x 4 GPUs = 64 samples for validation
 val_check_interval: 500 # 500 means every 8 (batch) * 4 (gpus) * 500 = 16000 training samples
 
 # Checkpointing

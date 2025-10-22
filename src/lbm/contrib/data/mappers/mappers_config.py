@@ -21,9 +21,12 @@ class RandomPixelMaskingConfig(BaseMapperConfig):
     seed_key: str | None = None
 
 @dataclass
-class CustomResizeConfig(BaseMapperConfig):
+class AspectRatioResizeConfig(BaseMapperConfig):
     """
-    Crop the input so that its height and width are multiples of a given number.
+    Resize an image to a predefined list of size (hardcoded in aspect_ratios.py), depending on args.resolution 
+    and the aspect ratio of the image.
+
+    If size_output_key is not None, it outputs the size of the cropped image (useful for size-related bucketing).
 
     Args:
 
@@ -47,6 +50,7 @@ class RandomMaskConfig(BaseMapperConfig):
         key (str): Key to create the mask for, used to get the image size.
         seed_key (Optional[str]): Key containing the seed to use for random number generation.
             If None, no seed is used. Default is None.
+        channels (int): Number of channels of the mask to create. Default is 1.
     """
 
     key: str = "image"

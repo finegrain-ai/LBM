@@ -1,4 +1,4 @@
-# Copied from https://github.com/NVlabs/Sana/blob/34b4aa5c102bfa36cb57ad68a43a15ec7fe3f411/diffusion/data/datasets/utils.py#L1
+# Adapted from https://github.com/NVlabs/Sana/blob/34b4aa5c102bfa36cb57ad68a43a15ec7fe3f411/diffusion/data/datasets/utils.py#L1
 # Changes:
 # * Added utilities like "get_aspect_ratios"
 # * Replaced list with tuples

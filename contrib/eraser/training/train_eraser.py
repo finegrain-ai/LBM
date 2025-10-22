@@ -45,8 +45,8 @@ from lbm.data.mappers import (
 from lbm.contrib.data.mappers import (
     RandomPixelMasking,
     RandomPixelMaskingConfig,
-    CustomResize,
-    CustomResizeConfig,
+    AspectRatioResize,
+    AspectRatioResizeConfig,
     RandomMask,
     RandomMaskConfig,
 )
@@ -504,8 +504,8 @@ def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
                         ],
                     )
                 ),
-                CustomResize(
-                    CustomResizeConfig(
+                AspectRatioResize(
+                    AspectRatioResizeConfig(
                         key="after", 
                         resolution=resolution, 
                         size_output_key="image_size"
@@ -546,7 +546,7 @@ def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
 def get_data_module(
     train_shards: List[str],
     validation_shards: List[str],
-    batch_size: int,
+    train_batch_size: int,
     resolution: int,
 ):
 
@@ -577,7 +577,7 @@ def get_data_module(
         shuffle_before_filter_mappers_buffer_size=4000,
         # not needed to shuffle after filter mappers
         shuffle_after_filter_mappers_buffer_size=None,
-        per_worker_batch_size=batch_size,
+        per_worker_batch_size=train_batch_size,
         num_workers=min(10, len(train_shards_path_or_urls_unbraced))
     )
 
@@ -633,7 +633,7 @@ def main(
     source_key: str = "before",
     target_key: str = "after",
     neptune_project: str = "LBM-Eraser",
-    batch_size: int = 8,
+    train_batch_size: int = 8,
     num_steps: List[int] = [1, 2, 4],
     learning_rate: float = 5e-5,
     learning_rate_scheduler: str = None,
@@ -688,7 +688,7 @@ def main(
     data_module = get_data_module(
         train_shards=train_shards,
         validation_shards=validation_shards,
-        batch_size=batch_size,
+        train_batch_size=train_batch_size,
         resolution=resolution
     )
 
