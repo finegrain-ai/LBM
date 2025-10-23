@@ -65,7 +65,7 @@ First download the files
 git lfs install
 git clone git@hf.co:datasets/supermodelresearch/Re-LAION-Caption19M data/supermodelresearch/Re-LAION-Caption19M
 ```
-Then extract the images with `aestetic > 0.5` and `pwatermark < 0.2` (takes ~50s)
+Then extract the images with `aesthetic_score > 0.5` and `pwatermark < 0.2` (takes ~50s)
 ```bash
 duckdb < contrib/eraser/datasets/re_laion_caption19m_filter.sql
 ```
