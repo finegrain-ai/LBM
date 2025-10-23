@@ -175,11 +175,61 @@ class TrainingPipeline(pl.LightningModule):
             seed = seed_from_string("-".join(val_batch[self.model.config.seed_key]))
         else:
             seed = None
-        loss = self.model(val_batch, device=self.device, seed=seed)["loss"]
+        if self.model.timestep_sampling == "custom_timesteps":
+            target_key = self.model.config.target_key
+            n_samples = val_batch[target_key].shape[0]
+            selected_timesteps = self.model.selected_timesteps
+            prob = self.model.prob
 
-        metrics = self.model.compute_metrics(val_batch)
+            out = {}
 
-        return {"loss": loss, "metrics": metrics}
+            # Inspired by what is done in SD3 https://arxiv.org/pdf/2403.03206 
+            #  Section 5.3.3
+            #  "we sample loss levels equidistant in t ∈ (0, 1) and compute validation"
+            #  "loss for each level separately. We then average the loss across all but the last (t = 1) levels"
+            # NB: In SD3, t = 1 corresponds to timestep 1000 here
+            #
+            # Here we follow the same idea with key differences : 
+            # * We intuit that they skip t = 1000 in SD3 because t2i is an ambiguous task
+            #   where different output images can correspond to the same input prompt.
+            #   In the context of i2i, the input image provides a strong conditioning
+            #   signal and we can include t = 1000 in the validation loss
+            # * We use levels from `selected_timesteps` and weight them by `prob` as in training
+
+            for timestep in selected_timesteps:
+                timesteps_tensor = torch.full(
+                    (n_samples,), timestep, device=self.device, dtype=torch.long
+                )
+                timestep_out = self.model(val_batch, device=self.device, seed=seed, timestep=timesteps_tensor)
+                out[f"loss_t{timestep}"] = timestep_out["loss"]
+                out[f"latent_recon_loss_t{timestep}"] = timestep_out["latent_recon_loss"]
+                out[f"pixel_recon_loss_t{timestep}"] = timestep_out["pixel_recon_loss"]
+            
+            out["loss"] = sum(
+                out[f"loss_t{timestep}"] * prob[i]
+                for i, timestep in enumerate(selected_timesteps)
+            )
+
+            out["latent_recon_loss"] = sum(
+                out[f"latent_recon_loss_t{timestep}"] * prob[i]
+                for i, timestep in enumerate(selected_timesteps)
+            )
+
+            out["pixel_recon_loss"] = sum(
+                out[f"pixel_recon_loss_t{timestep}"] * prob[i]
+                for i, timestep in enumerate(selected_timesteps)
+            )
+
+        else: # model.timestep_sampling != "custom_timesteps"
+            
+            forward_out = self.model(val_batch, device=self.device, seed=seed)
+            out["loss"] = forward_out["loss"]
+            out["latent_recon_loss"] = forward_out["latent_recon_loss"]
+            out["pixel_recon_loss"] = forward_out["pixel_recon_loss"]
+        
+        out["metrics"] = self.model.compute_metrics(val_batch)
+
+        return out
 
     def log_samples(self, batch: Dict[str, Any]):
         logging.debug("log_samples")

@@ -93,8 +93,16 @@ class LBMModel(BaseModel):
         if self.conditioner is not None:
             self.conditioner.on_fit_start(device=device, *args, **kwargs)
 
-    def forward(self, batch: Dict[str, Any], step=0, batch_idx=0, seed=None, *args, **kwargs):
-
+    def forward(
+        self, 
+        batch: Dict[str, Any], 
+        step: int = 0, 
+        batch_idx: int = 0, 
+        seed: Optional[int] = None, 
+        timestep: Optional[torch.Tensor] = None, 
+        *args, 
+        **kwargs
+    ) -> Dict[str, torch.Tensor]:
         self.num_iterations += 1
 
         # Get inputs/latents
@@ -132,12 +140,15 @@ class LBMModel(BaseModel):
 
         else:
             z_source = source_image
+        
+        if timestep is None:
+            # Sample a timestep
+            timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device, seed=seed)
 
         # Get conditionings
         conditioning = self._get_conditioning(batch, *args, **kwargs)
 
         # Sample a timestep
-        timestep = self._timestep_sampling(n_samples=z.shape[0], device=z.device, seed=seed)
         sigmas = None
 
         # Create interpolant
