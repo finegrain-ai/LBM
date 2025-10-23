@@ -200,7 +200,7 @@ class TrainingPipeline(pl.LightningModule):
                 timesteps_tensor = torch.full(
                     (n_samples,), timestep, device=self.device, dtype=torch.long
                 )
-                timestep_out = self.model.forward_timestep(val_batch, timestep=timesteps_tensor, device=self.device, seed=seed)
+                timestep_out = self.model(val_batch, timestep=timesteps_tensor, device=self.device, seed=seed)
                 out[f"loss_t{timestep}"] = timestep_out["loss"]
                 out[f"latent_recon_loss_t{timestep}"] = timestep_out["latent_recon_loss"]
                 out[f"pixel_recon_loss_t{timestep}"] = timestep_out["pixel_recon_loss"]
