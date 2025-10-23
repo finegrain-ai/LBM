@@ -188,7 +188,7 @@ class TrainingPipeline(pl.LightningModule):
             #  Section 5.3.3
             #  "we sample loss levels equidistant in t ∈ (0, 1) and compute validation"
             #  "loss for each level separately. We then average the loss across all but the last (t = 1) levels"
-            #. NB: In SD3, t = 1 corresponds to timestep 1000 here
+            # NB: In SD3, t = 1 corresponds to timestep 1000 here
             #
             # Here we follow the same idea with key differences : 
             # * We intuit that they skip t = 1000 in SD3 because t2i is an ambiguous task
