@@ -176,7 +176,6 @@ class TrainingPipeline(pl.LightningModule):
         else:
             seed = None
         if self.model.timestep_sampling == "custom_timesteps":
-
             target_key = self.model.config.target_key
             n_samples = val_batch[target_key].shape[0]
             selected_timesteps = self.model.selected_timesteps
