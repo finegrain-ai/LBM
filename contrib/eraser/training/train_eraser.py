@@ -620,7 +620,7 @@ def get_data_module(
 
     batched_fn = bucketing_batch(
         bucket_key="image_size",
-        partial=True,
+        partial=False,
     )
 
     # data module

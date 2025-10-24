@@ -28,7 +28,7 @@ def bucketing_batch(
             Key in the sample used to retrieve the image size as a (height, width) tuple for aspect ratio bucketing.
         
         partial (bool):
-            Whether to send the last batch if it's smaller than the specified batch size. Defaults to False
+            Whether to send the last batch if it's smaller than the specified batch size.
 
         max_buckets (int):
             Maximum number of different aspect ratios to allow. Defaults to 300.
@@ -63,7 +63,7 @@ def bucketing_batch(
 
             for bucket in _buckets.values():
                 if bucket:  # do not collate_fn empty buckets
-                    if not partial or len(bucket) == batchsize:
+                    if partial or len(bucket) == batchsize:
                         yield collation_fn(bucket)
                     bucket.clear()
 
