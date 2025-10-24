@@ -2,7 +2,7 @@ import importlib
 import logging
 import re
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import pytorch_lightning as pl
 import torch
@@ -253,3 +253,15 @@ class TrainingPipeline(pl.LightningModule):
                         logs[key] = batch[key]
 
         return logs
+    
+    def configure_gradient_clipping(
+        self,
+        optimizer,
+        gradient_clip_val: Optional[Union[int, float]] = None,
+        gradient_clip_algorithm: Optional[str] = None,
+    ):
+        """
+        Inspired from https://github.com/Lightning-AI/pytorch-lightning/issues/13339#issuecomment-1161584982
+        """
+        assert gradient_clip_algorithm in ('norm', None), gradient_clip_algorithm
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip_val)
