@@ -34,7 +34,6 @@ val_check_interval: 500 # 500 means every 8 (batch) * 4 (gpus) * 500 = 16000 tra
 
 # Checkpointing
 resume_from_checkpoint: false
-save_interval: 500 # synced with val_check_interval
 # Each checkpoint is 5.1GB, 25 checkpoints = 125GB
 # 25 * 500 = 12500 last steps are covered
 save_top_k: 25

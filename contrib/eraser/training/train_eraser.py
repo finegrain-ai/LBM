@@ -669,7 +669,6 @@ def main(
     resume_from_checkpoint: bool = True,
     max_epochs: int = 100,
     bridge_noise_sigma: float = 0.005,
-    save_interval: int = 1000,
     limit_val_batches: int = 2,
     val_check_interval: int = 1000,
     save_top_k: int = 1,
@@ -814,7 +813,6 @@ def main(
             LearningRateMonitor(logging_interval="step"),
             ModelCheckpoint(
                 dirpath=save_ckpt_path,
-                every_n_train_steps=save_interval,
                 save_last=True,
                 save_top_k=save_top_k,
                 monitor="val/loss",       # metric to rank by
