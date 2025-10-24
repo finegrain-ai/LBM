@@ -114,8 +114,13 @@ To limit to a single GPU
 export CUDA_VISIBLE_DEVICES=0
 ```
 
-Then
+Then run 1st stage training
 ```bash
-uv run python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/eraser.yaml
+uv run python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/1st-stage-inpainter.yaml
+```
+
+Then run 2nd stage training
+```bash
+uv run python contrib/eraser/training/train_eraser.py contrib/eraser/training/config/2nd-stage-eraser.yaml
 ```
 

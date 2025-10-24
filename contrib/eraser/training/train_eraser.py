@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 from typing import List, Optional, Tuple, Any, Dict
+from attr import dataclass
 from torch import distributed as dist
 
 import braceexpand
@@ -31,7 +32,7 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModule, DataModuleConfig
+from lbm.data.datasets import DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
 from lbm.data.mappers import (
     KeyRenameMapper,
@@ -42,6 +43,7 @@ from lbm.data.mappers import (
     TorchvisionMapper,
     TorchvisionMapperConfig,
 )
+from lbm.contrib.data.hybrid_data_module import HybridDataModule, DataPipelineConfig
 from lbm.contrib.data.mappers import (
     RandomPixelMasking,
     RandomPixelMaskingConfig,
@@ -482,7 +484,7 @@ def get_model(
     )
 
     # LBM Model
-    model = LBMModel(
+    return LBMModel(
         config,
         denoiser=denoiser,
         training_noise_scheduler=training_noise_scheduler,
@@ -491,17 +493,97 @@ def get_model(
         conditioner=conditioner,
     ).to(torch.bfloat16)
 
-    return model
 
-def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
-    filters_mappers = [
-        KeyFilter(KeyFilterConfig(keys=["jpg", "__key__"], verbose=True)),
+def eraser_filter_mappers(resolution: int, extension: str = "jpg") -> list[MapperWrapper | KeyFilter]:
+    return [
+        KeyFilter(KeyFilterConfig(keys=[f"before.{extension}", f"after.{extension}", f"mask.png", "__key__"], verbose=True)),
         MapperWrapper(
             [
                 KeyRenameMapper(
                     KeyRenameMapperConfig(
                         key_map={
-                            "jpg": "after",
+                            f"before.{extension}": "before_unmasked",
+                            f"after.{extension}": "after",
+                            f"mask.png": "mask",
+                            "__key__": "uid",
+                        }
+                    )
+                ),
+                TorchvisionMapper(
+                    TorchvisionMapperConfig(
+                        key="before_unmasked",
+                        transforms=["ToTensor"],
+                        transforms_kwargs=[
+                            {}
+                        ],
+                    )
+                ),
+                TorchvisionMapper(
+                    TorchvisionMapperConfig(
+                        key="after",
+                        transforms=["ToTensor"],
+                        transforms_kwargs=[
+                            {}
+                        ],
+                    )
+                ),
+                TorchvisionMapper(
+                    TorchvisionMapperConfig(
+                        key="mask",
+                        transforms=["ToTensor", "Normalize"],
+                        transforms_kwargs=[
+                            {},
+                            {"mean": 0.0, "std": 1.0},
+                        ],
+                    )
+                ),
+                AspectRatioResize(
+                    AspectRatioResizeConfig(
+                        key="before_unmasked", 
+                        resolution=resolution, 
+                    )
+                ),
+                AspectRatioResize(
+                    AspectRatioResizeConfig(
+                        key="after", 
+                        resolution=resolution, 
+                        size_output_key="image_size"
+                    )
+                ),
+                AspectRatioResize(
+                    AspectRatioResizeConfig(
+                        key="mask", 
+                        resolution=resolution, 
+                    )
+                ),
+                # Random pixel masking is made on [0, 1] tensors (before RescaleMapper)
+                RandomPixelMasking(
+                    RandomPixelMaskingConfig(
+                        key="before_unmasked",
+                        mask_key="mask",
+                        output_key="before",
+                        verbose=True,
+                        seed_key="uid"
+                    )
+                ),
+                RescaleMapper(RescaleMapperConfig(key="mask", verbose=True)), # for visualization only
+                RescaleMapper(RescaleMapperConfig(key="before", verbose=True)), # for visualization only
+                RescaleMapper(RescaleMapperConfig(key="after", verbose=True)),
+
+            ],
+        ),
+    ]
+
+
+def inpainter_filter_mappers(resolution: int, extension: str) -> list[MapperWrapper | KeyFilter]:
+    return [
+        KeyFilter(KeyFilterConfig(keys=[extension, "__key__"], verbose=True)),
+        MapperWrapper(
+            [
+                KeyRenameMapper(
+                    KeyRenameMapperConfig(
+                        key_map={
+                            extension: "after",
                             "__key__": "uid",
                         }
                     )
@@ -551,85 +633,97 @@ def get_filter_mappers(resolution: int) -> list[MapperWrapper | KeyFilter]:
         ),
     ]
 
-    return filters_mappers
+@dataclass
+class ShardConfig:
+    path: str
+    type: str # "inpainter" or "eraser"
+    name: str
+    weight: float = 1.0
+    shuffle_before_split_by_node_buffer_size: Optional[int] = None
+    shuffle_before_split_by_workers_buffer_size: Optional[int] = None
+    shuffle_before_filter_mappers_buffer_size: Optional[int] = None
+    shuffle_after_filter_mappers_buffer_size: Optional[int] = None
+    extension: str = "jpg"
+
+    @staticmethod
+    def from_dict(d: dict) -> "ShardConfig":
+        assert "path" in d, "ShardConfig requires 'path' field"
+        assert "type" in d, "ShardConfig requires 'type' field"
+        assert "name" in d, "ShardConfig requires 'name' field"
+
+        return ShardConfig(
+            path=d["path"],
+            type=d["type"],
+            weight=d.get("weight", 1.0),
+            name=d["name"],
+            extension=d.get("extension", "jpg"),
+        )
+    
+    def to_datapipeline_config(
+        self, 
+        resolution: int,
+        per_worker_batch_size: int = 16,
+    ) -> DataPipelineConfig:
+
+        if self.type == "eraser":
+            filters_mappers = eraser_filter_mappers(resolution=resolution, extension=self.extension)
+        elif self.type == "inpainter":
+            filters_mappers = inpainter_filter_mappers(resolution=resolution, extension=self.extension)
+        else:
+            raise ValueError(f"Unknown shard type: {self.type}")
+        
+        shards_path_or_urls = list(braceexpand.braceexpand(self.path))
+        data_module_config = DataModuleConfig(
+            shards_path_or_urls=shards_path_or_urls,
+            decoder="pil",
+            shuffle_before_split_by_node_buffer_size=self.shuffle_before_split_by_node_buffer_size,
+            shuffle_before_split_by_workers_buffer_size=self.shuffle_before_split_by_workers_buffer_size,
+            shuffle_before_filter_mappers_buffer_size=self.shuffle_before_filter_mappers_buffer_size,
+            shuffle_after_filter_mappers_buffer_size=self.shuffle_after_filter_mappers_buffer_size,
+            per_worker_batch_size=per_worker_batch_size,  # will be set in HybridDataModule
+        )
+
+        return DataPipelineConfig(
+            data_module_config=data_module_config,
+            name=self.name,
+            filters_mappers=filters_mappers,
+            batched_fn=bucketing_batch(bucket_key="image_size", partial=False),
+        )
 
 
 def get_data_module(
-    train_shards: List[str],
-    validation_shards: List[str],
+    train_shards: List[dict],
+    validation_shards: List[dict],
     train_batch_size: int,
     resolution: int,
+    eval_seed: int = 42,
+    train_num_workers: int = 10,
+    eval_num_workers: int = 1,
 ):
 
     # TRAIN
-    train_filters_mappers = get_filter_mappers(resolution=resolution)
-
-    # unbrace urls
-    train_shards_path_or_urls_unbraced = []
-    for train_shards_path_or_url in train_shards:
-        train_shards_path_or_urls_unbraced.extend(
-            braceexpand.braceexpand(train_shards_path_or_url)
+    train_pipeline_configs = [
+        ShardConfig.from_dict(shard_dict).to_datapipeline_config(
+            resolution=resolution,
+            per_worker_batch_size=train_batch_size,
         )
+        for shard_dict in train_shards
+    ]
 
-    # shuffle shards
-    random.shuffle(train_shards_path_or_urls_unbraced)
-
-    # data config
-    train_data_config = DataModuleConfig(
-        shards_path_or_urls=train_shards_path_or_urls_unbraced,
-        decoder="pil",
-        # RORD dataset contains 400K images in 400 shards
-        # 200 out of 400 shards
-        shuffle_before_split_by_node_buffer_size=min(200, len(train_shards_path_or_urls_unbraced)),
-        # Each node has 400/4 ~ 100 shards, so 30 looks fine
-        shuffle_before_split_by_workers_buffer_size=50,
-        # 10 workers means each worker sees ~ 10 shards = 10k samples
-        # Set it to 4k
-        shuffle_before_filter_mappers_buffer_size=4000,
-        # not needed to shuffle after filter mappers
-        shuffle_after_filter_mappers_buffer_size=None,
-        per_worker_batch_size=train_batch_size,
-        num_workers=min(10, len(train_shards_path_or_urls_unbraced))
-    )
-
-    # VALIDATION
-    validation_filters_mappers = get_filter_mappers(resolution=resolution)
-
-    # unbrace urls
-    validation_shards_path_or_urls_unbraced = []
-    for validation_shards_path_or_url in validation_shards:
-        validation_shards_path_or_urls_unbraced.extend(
-            braceexpand.braceexpand(validation_shards_path_or_url)
+    eval_pipeline_configs = [
+        ShardConfig.from_dict(shard_dict).to_datapipeline_config(
+            resolution=resolution,
+            per_worker_batch_size=1, # eval batch size is 1 to avoid 
         )
+        for shard_dict in validation_shards
+    ]
 
-    validation_data_config = DataModuleConfig(
-        shards_path_or_urls=validation_shards_path_or_urls_unbraced,
-        decoder="pil",
-        # deactivate shuffling for validation, so we validate on the same
-        # samples each time
-        shuffle_before_split_by_node_buffer_size=None,
-        shuffle_before_split_by_workers_buffer_size=None,
-        shuffle_before_filter_mappers_buffer_size=None,
-        shuffle_after_filter_mappers_buffer_size=None,
-        # We set validation batch_size to 1 (and num_workers=1), 
-        # so we validate on various image sizes
-        # (it avoids bucketing related side-effects)
-        per_worker_batch_size=1,
-        num_workers=1,
-    )
-
-    batched_fn = bucketing_batch(
-        bucket_key="image_size",
-        partial=False,
-    )
-
-    # data module
-    data_module = DataModule(
-        train_config=train_data_config,
-        train_filters_mappers=train_filters_mappers,
-        eval_config=validation_data_config,
-        eval_filters_mappers=validation_filters_mappers,
-        batched_fn=batched_fn
+    data_module = HybridDataModule(
+        train_pipeline_configs=train_pipeline_configs,
+        eval_pipeline_configs=eval_pipeline_configs,
+        eval_seed=eval_seed,
+        train_num_workers=train_num_workers,
+        eval_num_workers=eval_num_workers,
     )
 
     return data_module
@@ -839,3 +933,4 @@ def main_from_config(path_config: str = None):
 
 if __name__ == "__main__":
     fire.Fire(main_from_config)
+
