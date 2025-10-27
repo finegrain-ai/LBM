@@ -718,7 +718,7 @@ def main(
             "num_steps": num_steps,
         },
     )
-    if resume_from_checkpoint:
+    if resume_from_checkpoint is not None:
         assert os.path.exists(resume_from_checkpoint), f"Checkpoint path {resume_from_checkpoint} does not exist."
         start_ckpt = resume_from_checkpoint
         print(f"Resuming from checkpoint: {resume_from_checkpoint}")
