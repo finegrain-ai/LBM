@@ -666,7 +666,7 @@ def main(
     save_ckpt_path: str = "./checkpoints",
     gradient_clip_val: Optional[float] = None,
     log_interval: int = 10,
-    resume_from_checkpoint: bool = True,
+    resume_from_checkpoint: Optional[str] = None,
     max_epochs: int = 100,
     bridge_noise_sigma: float = 0.005,
     limit_val_batches: int = 2,
@@ -718,13 +718,10 @@ def main(
             "num_steps": num_steps,
         },
     )
-    if (
-        os.path.exists(save_ckpt_path)
-        and resume_from_checkpoint
-        and "last.ckpt" in os.listdir(save_ckpt_path)
-    ):
-        start_ckpt = f"{save_ckpt_path}/last.ckpt"
-        print(f"Resuming from checkpoint: {start_ckpt}")
+    if resume_from_checkpoint:
+        assert os.path.exists(resume_from_checkpoint), f"Checkpoint path {resume_from_checkpoint} does not exist."
+        start_ckpt = resume_from_checkpoint
+        print(f"Resuming from checkpoint: {resume_from_checkpoint}")
 
     else:
         start_ckpt = None
@@ -804,7 +801,9 @@ def main(
         strategy=strategy,
         default_root_dir="logs",
         logger=loggers.NeptuneLogger(
-            project=neptune_project, name=run_name, log_model_checkpoints=False
+            project=neptune_project, 
+            name=run_name, 
+            log_model_checkpoints=False
         ),
         callbacks=[
             EraserLogger(
