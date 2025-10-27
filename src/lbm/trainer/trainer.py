@@ -259,9 +259,8 @@ class TrainingPipeline(pl.LightningModule):
         optimizer,
         gradient_clip_val: Optional[Union[int, float]] = None,
         gradient_clip_algorithm: Optional[str] = None,
-    ):
-        """
-        Inspired from https://github.com/Lightning-AI/pytorch-lightning/issues/13339#issuecomment-1161584982
-        """
+    ):        
+        # Without this, FSDP does not support the gradient_clip_val setting in Trainer
+        # See https://github.com/Lightning-AI/pytorch-lightning/issues/13339#issuecomment-1161584982
         assert gradient_clip_algorithm in ('norm', None), gradient_clip_algorithm
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), gradient_clip_val)
