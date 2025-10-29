@@ -14,12 +14,20 @@ conditioning_images_keys: []
 conditioning_masks_keys: []
 resolution: 512
 
-train_shards: 
-- "data/Re-LAION-1300K/{00008..01432}.tar"
-validation_shards: 
-- "data/Re-LAION-1300K/{00000..00007}.tar"
+train_data: 
+  path: "data/Re-LAION-1300K/{00008..01432}.tar"
+  per_worker_batch_size: 8
+  num_workers: 10
+  kind: "inpainter"
+  name: "Re-LAION-1300K-train"
+  shuffle_before_split_by_node_buffer_size: 800 # 800 out of 1425 shards
+validation_data: 
+  path: "data/Re-LAION-1300K/{00000..00007}.tar"
+  per_worker_batch_size: 1
+  num_workers: 1
+  kind: "inpainter"
+  name: "Re-LAION-1300K-val"
 
-train_batch_size: 8
 learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW
 num_steps: [1, 2, 4]
@@ -39,4 +47,4 @@ resume_from_checkpoint: null
 # Each checkpoint is 5.1GB, 25 checkpoints = 125GB
 # 25 * 500 = 12500 last steps are covered
 save_top_k: 25
-save_ckpt_path: ./checkpoints
+save_ckpt_path: ./checkpoints-1st-stage

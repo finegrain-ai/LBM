@@ -6,6 +6,6 @@
 examples/inference/ckpts/*
 examples/inference/examples/*
 envs/*
-checkpoints/*
+checkpoints*
 data/*
 .neptune
