@@ -14,18 +14,24 @@ conditioning_images_keys: []
 conditioning_masks_keys: []
 resolution: 512
 
-train_shards: 
-- path: "data/RORD-shuffled/train-{000000..000408}.tar" # drop the 4 last shards cause the last shard does not have the same number of samples
-  type: "eraser"
+train_data: 
+  path: "data/RORD-shuffled/train-{000000..000408}.tar" # drop the 4 last shards cause the last shard does not have the same number of samples
+  per_worker_batch_size: 8
+  num_workers: 10
+  kind: "eraser"
   name: "RORD-shuffled"
   shuffle_before_split_by_node_buffer_size: 200 # 200 out of 400 shards
-validation_shards: 
-- path: "data/BaiLing/RemovalBench-{0000..0007}.tar"
-  type: "eraser"
+validation_data: 
+  path: "data/BaiLing/RemovalBench-{0000..0007}.tar"
+  # We set validation batch_size to 1 (and num_workers=1), 
+  # so we validate on various image sizes
+  # (it avoids bucketing related side-effects)
+  per_worker_batch_size: 1
+  num_workers: 1
+  kind: "eraser"
   name: "RemovalBench"
   extension: "png"
 
-train_batch_size: 8
 learning_rate: 3e-5 # see Appendix A.1
 optimizer: AdamW
 num_steps: [1, 2, 4]

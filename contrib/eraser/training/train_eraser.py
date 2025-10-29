@@ -4,8 +4,9 @@ import os
 import random
 import re
 import shutil
-from typing import List, Optional, Tuple, Any, Dict
+from typing import List, Optional, Tuple, Any, Dict, Literal
 from torch import distributed as dist
+from dataclasses import dataclass
 
 import braceexpand
 import fire
@@ -31,7 +32,7 @@ from torchmetrics import Metric
 from torchvision.utils import make_grid
 import torch.distributed as dist
 
-from lbm.data.datasets import DataModuleConfig
+from lbm.data.datasets import DataModule, DataModuleConfig
 from lbm.data.filters import KeyFilter, KeyFilterConfig
 from lbm.data.mappers import (
     KeyRenameMapper,
@@ -42,7 +43,6 @@ from lbm.data.mappers import (
     TorchvisionMapper,
     TorchvisionMapperConfig,
 )
-from lbm.contrib.data.hybrid_data_module import HybridDataModule, DataPipelineConfig
 from lbm.contrib.data.mappers import (
     RandomPixelMasking,
     RandomPixelMaskingConfig,
@@ -633,111 +633,82 @@ def inpainter_filter_mappers(resolution: int, extension: str) -> list[MapperWrap
     ]
 
 @dataclass
-class ShardConfig:
+class DataConfig:
     path: str
-    type: str # "inpainter" or "eraser"
+    kind: Literal["inpainter", "eraser"] # "inpainter" or "eraser"
     name: str
+    per_worker_batch_size: int
     weight: float = 1.0
     shuffle_before_split_by_node_buffer_size: Optional[int] = None
     shuffle_before_split_by_workers_buffer_size: Optional[int] = None
     shuffle_before_filter_mappers_buffer_size: Optional[int] = None
     shuffle_after_filter_mappers_buffer_size: Optional[int] = None
     extension: str = "jpg"
+    num_workers: int = 1
 
-    @staticmethod
-    def from_dict(d: dict) -> "ShardConfig":
-        assert "path" in d, "ShardConfig requires 'path' field"
-        assert "type" in d, "ShardConfig requires 'type' field"
-        assert "name" in d, "ShardConfig requires 'name' field"
-
-        return ShardConfig(
-            path=d["path"],
-            type=d["type"],
-            weight=d.get("weight", 1.0),
-            name=d["name"],
-            extension=d.get("extension", "jpg"),
-        )
+    @classmethod
+    def from_dict(cls, d: dict) -> "DataConfig":
+        return cls(**d)
     
-    def to_datapipeline_config(
-        self, 
-        resolution: int,
-        per_worker_batch_size: int = 16,
-    ) -> DataPipelineConfig:
+    def to_datamodule_config(
+        self
+    ) -> DataModuleConfig:
 
-        if self.type == "eraser":
-            filters_mappers = eraser_filter_mappers(resolution=resolution, extension=self.extension)
-        elif self.type == "inpainter":
-            filters_mappers = inpainter_filter_mappers(resolution=resolution, extension=self.extension)
-        else:
-            raise ValueError(f"Unknown shard type: {self.type}")
-        
         shards_path_or_urls = list(braceexpand.braceexpand(self.path))
-        data_module_config = DataModuleConfig(
+        return DataModuleConfig(
             shards_path_or_urls=shards_path_or_urls,
             decoder="pil",
             shuffle_before_split_by_node_buffer_size=self.shuffle_before_split_by_node_buffer_size,
             shuffle_before_split_by_workers_buffer_size=self.shuffle_before_split_by_workers_buffer_size,
             shuffle_before_filter_mappers_buffer_size=self.shuffle_before_filter_mappers_buffer_size,
             shuffle_after_filter_mappers_buffer_size=self.shuffle_after_filter_mappers_buffer_size,
-            per_worker_batch_size=per_worker_batch_size,  # will be set in HybridDataModule
+            per_worker_batch_size=self.per_worker_batch_size,
+            num_workers=self.num_workers
         )
 
-        return DataPipelineConfig(
-            data_module_config=data_module_config,
-            name=self.name,
-            filters_mappers=filters_mappers,
-            batched_fn=bucketing_batch(bucket_key="image_size", partial=False),
-        )
-
+    def to_filter_mappers(self, resolution: int) -> list[MapperWrapper | KeyFilter]:
+        if self.kind == "eraser":
+            return eraser_filter_mappers(resolution=resolution, extension=self.extension)
+        elif self.kind == "inpainter":
+            return inpainter_filter_mappers(resolution=resolution, extension=self.extension)
+        else:
+            raise ValueError(f"Unknown ShardConfig kind: {self.kind}")
 
 def get_data_module(
-    train_shards: List[dict],
-    validation_shards: List[dict],
-    train_batch_size: int,
+    train_data: List[str],
+    validation_data: List[str],
     resolution: int,
-    eval_seed: int = 42,
-    train_num_workers: int = 10,
-    eval_num_workers: int = 1,
 ):
 
-    # TRAIN
-    train_pipeline_configs = [
-        ShardConfig.from_dict(shard_dict).to_datapipeline_config(
-            resolution=resolution,
-            per_worker_batch_size=train_batch_size,
-        )
-        for shard_dict in train_shards
-    ]
+    train_data_config = DataConfig.from_dict(train_data)
+    validation_data_config = DataConfig.from_dict(validation_data)
 
-    eval_pipeline_configs = [
-        ShardConfig.from_dict(shard_dict).to_datapipeline_config(
-            resolution=resolution,
-            per_worker_batch_size=1, # eval batch size is 1 to avoid 
-        )
-        for shard_dict in validation_shards
-    ]
+    batched_fn = bucketing_batch(
+        bucket_key="image_size",
+        partial=False,
+    )
 
-    data_module = HybridDataModule(
-        train_pipeline_configs=train_pipeline_configs,
-        eval_pipeline_configs=eval_pipeline_configs,
-        eval_seed=eval_seed,
-        train_num_workers=train_num_workers,
-        eval_num_workers=eval_num_workers,
+    # data module
+    data_module = DataModule(
+        train_config=train_data_config.to_datamodule_config(),
+        train_filters_mappers=train_data_config.to_filter_mappers(resolution=resolution),
+        eval_config=validation_data_config.to_datamodule_config(),
+        eval_filters_mappers=validation_data_config.to_filter_mappers(resolution=resolution),
+        batched_fn=batched_fn
     )
 
     return data_module
 
 
 def main(
-    train_shards: List[str] = ["pipe:cat path/to/train/shards"],
-    validation_shards: List[str] = ["pipe:cat path/to/validation/shards"],
+    train_data: List[str] = ["pipe:cat path/to/train/shards"],
+    validation_data: List[str] = ["pipe:cat path/to/validation/shards"],
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
     source_key: str = "before",
     target_key: str = "after",
     neptune_project: str = "LBM-Eraser",
-    train_batch_size: int = 8,
     num_steps: List[int] = [1, 2, 4],
     learning_rate: float = 5e-5,
     learning_rate_scheduler: str = None,
@@ -789,9 +760,8 @@ def main(
     )
     
     data_module = get_data_module(
-        train_shards=train_shards,
-        validation_shards=validation_shards,
-        train_batch_size=train_batch_size,
+        train_data=train_data,
+        validation_data=validation_data,
         resolution=resolution
     )
 
