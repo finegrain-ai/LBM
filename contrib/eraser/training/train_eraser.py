@@ -671,7 +671,7 @@ class DataConfig:
         elif self.kind == "inpainter":
             return inpainter_filter_mappers(resolution=resolution, extension=self.extension)
         else:
-            raise ValueError(f"Unknown ShardConfig kind: {self.kind}")
+            raise ValueError(f"Unknown data kind: {self.kind}")
 
 def get_data_module(
     train_data: dict,
