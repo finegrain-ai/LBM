@@ -1,7 +1,8 @@
-from typing import Callable, List, Union, Optional
+from typing import Callable, List, Union
 
 import pytorch_lightning as pl
 import webdataset as wds
+from webdataset import DataPipeline
 
 from ..filters import BaseFilter, FilterWrapper
 from ..mappers import BaseMapper, MapperWrapper
@@ -34,9 +35,9 @@ class DataPipeline:
         filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
         ],
-        batched_filters_mappers: Optional[List[
+        batched_filters_mappers: List[
             Union[BaseMapper, BaseFilter, FilterWrapper, MapperWrapper]
-        ]] = None,
+        ] = None,
         batched_fn: Callable = wds.batched
     ):
         self.config = config

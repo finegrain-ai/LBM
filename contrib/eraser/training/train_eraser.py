@@ -5,7 +5,6 @@ import random
 import re
 import shutil
 from typing import List, Optional, Tuple, Any, Dict
-from attr import dataclass
 from torch import distributed as dist
 
 import braceexpand

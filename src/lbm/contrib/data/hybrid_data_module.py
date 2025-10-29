@@ -79,7 +79,10 @@ class MixedIterableDataset(IterableDataset):
 
 class HybridDataModule(pl.LightningDataModule):
     """
-    Main DataModule class for creating data loaders and training/evaluating models
+    Main DataModule class for mixing data loaders and training/evaluating models.
+    When mixing multiple datasets, the datasets are mixed according to the given weights.
+    
+    NB: For both train and eval, the mixing loop stops when the first is exhausted.
 
     Args:
 
