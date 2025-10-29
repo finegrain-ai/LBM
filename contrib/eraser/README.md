@@ -30,7 +30,7 @@ ETA on AWS `c6i.8xlarge`: 2h30
 uv run --script contrib/eraser/datasets/preprocess_rord.py
 ```
 
-Result is saved in `data/RORD-processed/` (auto-created if not existing)
+Result is saved in `data/RORD-shuffled/` (auto-created if not existing)
 
 ### Export a "lite" validation set
 

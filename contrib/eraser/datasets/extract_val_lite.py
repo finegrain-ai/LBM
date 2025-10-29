@@ -8,9 +8,9 @@ from pathlib import Path
 from collections import defaultdict
 
 # --- CONFIGURATION ---
-DATASET_DIR = Path("./data/RORD-processed/")  # directory containing val-*.tar
-OUTPUT_DIR = Path("./data/RORD-processed/")
-TMP_EXTRACT_DIR = Path("./data/RORD-processed-tmp/")
+DATASET_DIR = Path("./data/RORD-shuffled/")  # directory containing val-*.tar
+OUTPUT_DIR = Path("./data/RORD-shuffled/")
+TMP_EXTRACT_DIR = Path("./data/RORD-shuffled-tmp/")
 MAX_SAMPLES_PER_SHARD = 32  # ~340 total scenes, it gives 11 shards
 PATTERN = "val-0*.tar"  # pattern to match tar files
 
