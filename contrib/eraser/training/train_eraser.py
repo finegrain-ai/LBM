@@ -635,7 +635,7 @@ def inpainter_filter_mappers(resolution: int, extension: str) -> list[MapperWrap
 @dataclass
 class DataConfig:
     path: str
-    kind: Literal["inpainter", "eraser"] # "inpainter" or "eraser"
+    kind: Literal["inpainter", "eraser"]
     name: str
     per_worker_batch_size: int
     shuffle_before_split_by_node_buffer_size: Optional[int] = None
