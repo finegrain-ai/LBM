@@ -674,8 +674,8 @@ class DataConfig:
             raise ValueError(f"Unknown ShardConfig kind: {self.kind}")
 
 def get_data_module(
-    train_data: List[str],
-    validation_data: List[str],
+    train_data: dict,
+    validation_data: dict,
     resolution: int,
 ):
 
@@ -700,8 +700,8 @@ def get_data_module(
 
 
 def main(
-    train_data: List[str] = ["pipe:cat path/to/train/shards"],
-    validation_data: List[str] = ["pipe:cat path/to/validation/shards"],
+    train_data: dict,
+    validation_data: dict,
     backbone_signature: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
     vae_num_channels: int = 4,
     unet_input_channels: int = 4,
