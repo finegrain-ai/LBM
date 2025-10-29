@@ -638,7 +638,6 @@ class DataConfig:
     kind: Literal["inpainter", "eraser"] # "inpainter" or "eraser"
     name: str
     per_worker_batch_size: int
-    weight: float = 1.0
     shuffle_before_split_by_node_buffer_size: Optional[int] = None
     shuffle_before_split_by_workers_buffer_size: Optional[int] = None
     shuffle_before_filter_mappers_buffer_size: Optional[int] = None
